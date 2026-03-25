@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Expression Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 640px; margin: 0 auto;
+    padding: 12px;
+  }
+
+  #screen {
+    width: 100%; aspect-ratio: 2 / 1;
+    background: #0a0a0f; border-radius: 12px;
+    overflow: hidden; flex-shrink: 0;
+  }
+  #screen.light { background: #f0efe8; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  #expr-name {
+    text-align: center; font-size: 22px; font-weight: 700;
+    padding: 10px 0 2px; letter-spacing: 2px;
+  }
+  #expr-index { text-align: center; font-size: 11px; color: #888; }
+
+  #nav { display: flex; gap: 6px; justify-content: center; padding: 6px 0; }
+  #nav button, .ctrl-btn {
+    padding: 6px 16px; font: inherit; font-size: 12px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  #nav button:hover, .ctrl-btn:hover { background: #eee; }
+  .accent { background: #3b82f6 !important; color: #fff; border-color: #3b82f6 !important; }
+  .accent:hover { background: #2563eb !important; }
+
+  #controls { display: flex; gap: 10px; justify-content: center; padding: 4px 0; flex-wrap: wrap; }
+  #controls label { font-size: 11px; color: #888; display: flex; align-items: center; gap: 4px; }
+
+  /* Panels */
+  #panels {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+  }
+  .panel-title {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 8px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+  .slider-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; padding: 4px 0;
+  }
+  .sl-row { display: flex; align-items: center; gap: 4px; }
+  .sl-row label { font-size: 10px; color: #888; min-width: 56px; text-align: right; }
+  .sl-row input[type="range"] { flex: 1; height: 3px; }
+  .sl-row select { flex: 1; font: inherit; font-size: 10px; padding: 1px 2px; border: 1px solid #ddd; border-radius: 3px; }
+  .sl-val { font-size: 10px; font-weight: 600; min-width: 32px; color: #1a1a1a; }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 4px; padding: 8px 0;
+  }
+  .grid-btn {
+    padding: 5px 2px; font: inherit; font-size: 10px;
+    border: 1px solid #ddd; border-radius: 5px;
+    background: #fff; cursor: pointer; text-align: center;
+  }
+  .grid-btn:hover { background: #eee; }
+  .grid-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  .actions { display: flex; gap: 6px; justify-content: center; padding: 6px 0; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="screen"><canvas id="face"></canvas></div>
+  <div id="expr-name">idle</div>
+  <div id="expr-index">1 / --</div>
+
+  <div id="nav">
+    <button id="btn-prev">&larr;</button>
+    <button id="btn-play" class="accent">play</button>
+    <button id="btn-next">&rarr;</button>
+  </div>
+
+  <div id="controls">
+    <label><input type="checkbox" id="chk-theme"> light</label>
+    <label>speed <input type="range" id="speed" min="0.5" max="5" step="0.5" value="2" style="width:60px"> <span id="speed-val">2s</span></label>
+  </div>
+
+  <div id="panels">
+    <div id="grid"></div>
+
+    <div class="panel-title">Reactions</div>
+    <div id="reaction-grid" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 0;"></div>
+
+    <div class="panel-title">Left Eye</div>
+    <div class="slider-grid" id="sl-left-eye"></div>
+
+    <div class="panel-title">Right Eye</div>
+    <div class="slider-grid" id="sl-right-eye"></div>
+
+    <div class="panel-title">Eyes</div>
+    <div class="slider-grid" id="sl-eyes"></div>
+
+    <div class="panel-title">Mouth</div>
+    <div class="slider-grid" id="sl-mouth"></div>
+
+    <div class="panel-title">Face</div>
+    <div class="slider-grid" id="sl-face"></div>
+
+    <div class="actions">
+      <button class="ctrl-btn" id="btn-copy">copy values</button>
+      <button class="ctrl-btn" id="btn-mirror">mirror L→R</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { list, resolve, NEUTRAL, DEFAULT_EYE, DEFAULT_MOUTH, DEFAULT_FACE } from './js/expressions.js';
+import { eyeShapeNames, mouthShapeNames, eyes as eyeShapes, mouths as mouthShapes } from './js/shapes.js';
+import { lerp } from './js/utils/math.js';
+
+// ── State ──
+const names = list();
+let currentIdx = 0;
+let target = resolve(names[0]);
+let face = resolve('idle');
+let darkTheme = true;
+let autoPlay = false;
+let autoTimer = null;
+let speed = 2;
+
+// Blink
+let blinkAmt = 0, blinkPhase = 0, blinkTimer = 3, breathPhase = 0;
+let blinksRemaining = 0, blinkPause = 0;
+
+// ── Canvas ──
+const canvas = document.getElementById('face');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy, scale;
+
+function resize() {
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  W = parent.clientWidth; H = parent.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx = W / 2; cy = H / 2;
+  scale = Math.min(W, H) / 280;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Lerp helpers ──
+function lerpObj(cur, tgt, spd, dt) {
+  for (const k of Object.keys(tgt)) {
+    if (typeof tgt[k] === 'number' && typeof cur[k] === 'number') {
+      cur[k] = lerp(cur[k], tgt[k], spd * dt);
+    } else if (typeof tgt[k] === 'string') {
+      cur[k] = tgt[k];
+    }
+  }
+}
+
+// ── Helpers for shapes.js ──
+function roundRect(ctx, w, h, r) {
+  r = Math.min(r, w, h);
+  ctx.beginPath();
+  ctx.moveTo(-w + r, -h);
+  ctx.lineTo(w - r, -h);
+  ctx.quadraticCurveTo(w, -h, w, -h + r);
+  ctx.lineTo(w, h - r);
+  ctx.quadraticCurveTo(w, h, w - r, h);
+  ctx.lineTo(-w + r, h);
+  ctx.quadraticCurveTo(-w, h, -w, h - r);
+  ctx.lineTo(-w, -h + r);
+  ctx.quadraticCurveTo(-w, -h, -w + r, -h);
+  ctx.closePath();
+}
+
+// ── Draw ──
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const fg = darkTheme ? '#d7d0c8' : '#28261f';
+  const bg = darkTheme ? '#0a0a0f' : '#f0efe8';
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const breath = Math.sin(breathPhase) * 2 * scale;
+  ctx.save();
+  const skX = face.face.skewX || 0;
+  const skY = face.face.skewY || 0;
+  ctx.translate(cx + face.face.x * scale, cy + face.face.y * scale + breath);
+  ctx.rotate(face.face.tilt * Math.PI / 180);
+  const sx = face.face.scale * (1 - face.face.squash * 0.15);
+  const sy = face.face.scale * (1 + face.face.squash * 0.15);
+  ctx.scale(sx, sy);
+
+  const gap = face.eyeGap * scale / 2;
+
+  // Eyes
+  [
+    { side: -1, eye: face.leftEye },
+    { side:  1, eye: face.rightEye },
+  ].forEach(({ side, eye }) => {
+    const ps = 1 + skX * side * 0.4;
+    const ew = eye.w * scale / 2 * ps;
+    let eh = eye.h * scale / 2 * ps;
+    eh = eh * (1 - blinkAmt * 0.92);
+    eh = Math.max(1.5 * scale, eh);
+
+    const pShift = skX * side * -8 * scale;
+    const ex = side * gap + (eye.x || 0) * scale + pShift;
+    const ey = (eye.y || 0) * scale + skY * side * -4 * scale;
+    const tilt = (eye.tilt || 0) * side * Math.PI / 180;
+    const r = (eye.round || 0) * scale / 2 * ps;
+
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.rotate(tilt);
+    ctx.fillStyle = fg;
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = 3 * scale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (blinkAmt < 0.8) {
+      const drawFn = eyeShapes[eye.shape] || eyeShapes.pill;
+      drawFn(ctx, ew, eh, r);
+    }
+    ctx.restore();
+  });
+
+  // Blink line
+  if (blinkAmt > 0.8) {
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = 2.5 * scale;
+    ctx.lineCap = 'round';
+    [
+      { side: -1, eye: face.leftEye },
+      { side:  1, eye: face.rightEye },
+    ].forEach(({ side, eye }) => {
+      const ps = 1 + skX * side * 0.4;
+      const ew = eye.w * scale / 2 * ps;
+      const pShift = skX * side * -8 * scale;
+      const ex = side * gap + (eye.x || 0) * scale + pShift;
+      const ey = (eye.y || 0) * scale + skY * side * -4 * scale;
+      ctx.beginPath();
+      ctx.moveTo(ex - ew * 0.7, ey);
+      ctx.lineTo(ex + ew * 0.7, ey);
+      ctx.stroke();
+    });
+  }
+
+  // Mouth
+  if (face.mouth.show > 0.01) {
+    const m = face.mouth;
+    const mw = m.w * scale / 2;
+    const mh = m.h * scale / 2;
+    const my = m.y * scale;
+
+    ctx.save();
+    ctx.translate(skX * -6 * scale, my + skY * -3 * scale);
+    ctx.globalAlpha = m.show;
+    ctx.fillStyle = fg;
+    ctx.strokeStyle = fg;
+    ctx.lineWidth = 2.5 * scale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const drawFn = mouthShapes[m.shape] || mouthShapes.none;
+    drawFn(ctx, mw, mh, {
+      curve: (m.curve || 0) * scale,
+      open: m.open || 0,
+      round: (m.round || 2) * scale / 2,
+    });
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ── Loop ──
+let lastT = 0;
+function loop(now) {
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+  lastT = now;
+
+  face.eyeGap = lerp(face.eyeGap, target.eyeGap, 4 * dt);
+  lerpObj(face.leftEye, target.leftEye, 4, dt);
+  lerpObj(face.rightEye, target.rightEye, 4, dt);
+  lerpObj(face.mouth, target.mouth, 4, dt);
+  lerpObj(face.face, target.face, 4, dt);
+
+  // Blink
+  blinkTimer -= dt;
+  if (blinkPhase === 0) {
+    if (blinkPause > 0) { blinkPause -= dt; if (blinkPause <= 0) blinkPhase = 1; }
+    else if (blinkTimer <= 0) { blinksRemaining = Math.random() < 0.3 ? 2 : 1; blinkPhase = 1; }
+  }
+  const isDouble = blinksRemaining > 0;
+  if (blinkPhase === 1) { blinkAmt = Math.min(1, blinkAmt + dt * (isDouble ? 28 : 16)); if (blinkAmt >= 1) blinkPhase = 2; }
+  else if (blinkPhase === 2) {
+    blinkAmt = Math.max(0, blinkAmt - dt * (isDouble ? 22 : 12));
+    if (blinkAmt <= 0) { blinkAmt = 0; blinkPhase = 0; blinksRemaining--; if (blinksRemaining > 0) blinkPause = 0.04 + Math.random() * 0.03; else blinkTimer = 2 + Math.random() * 4; }
+  }
+  breathPhase += dt * 1.2;
+
+  draw();
+  requestAnimationFrame(loop);
+}
+lastT = performance.now();
+requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════
+// UI
+// ═══════════════════════════════════════
+
+const nameEl = document.getElementById('expr-name');
+const indexEl = document.getElementById('expr-index');
+
+function selectExpr(idx) {
+  currentIdx = idx;
+  target = resolve(names[idx]);
+  nameEl.textContent = names[idx];
+  indexEl.textContent = `${idx + 1} / ${names.length}`;
+  document.querySelectorAll('.grid-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  syncAll();
+}
+
+// Grid
+const gridEl = document.getElementById('grid');
+names.forEach((name, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'grid-btn';
+  btn.textContent = name;
+  btn.addEventListener('click', () => { selectExpr(i); stopAuto(); });
+  gridEl.appendChild(btn);
+});
+
+// Nav
+document.getElementById('btn-prev').addEventListener('click', () => { stopAuto(); selectExpr((currentIdx - 1 + names.length) % names.length); });
+document.getElementById('btn-next').addEventListener('click', () => { stopAuto(); selectExpr((currentIdx + 1) % names.length); });
+
+// Auto play
+const playBtn = document.getElementById('btn-play');
+function startAuto() { autoPlay = true; playBtn.textContent = 'stop'; autoTimer = setInterval(() => selectExpr((currentIdx + 1) % names.length), speed * 1000); }
+function stopAuto() { autoPlay = false; playBtn.textContent = 'play'; clearInterval(autoTimer); }
+playBtn.addEventListener('click', () => { if (autoPlay) stopAuto(); else startAuto(); });
+
+// Theme
+document.getElementById('chk-theme').addEventListener('change', (e) => {
+  darkTheme = !e.target.checked;
+  document.getElementById('screen').classList.toggle('light', !darkTheme);
+});
+
+// Speed
+const speedInput = document.getElementById('speed');
+const speedValEl = document.getElementById('speed-val');
+speedInput.addEventListener('input', () => { speed = parseFloat(speedInput.value); speedValEl.textContent = speed + 's'; if (autoPlay) { stopAuto(); startAuto(); } });
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowLeft') { stopAuto(); selectExpr((currentIdx - 1 + names.length) % names.length); }
+  if (e.key === 'ArrowRight') { stopAuto(); selectExpr((currentIdx + 1) % names.length); }
+  if (e.key === ' ') { e.preventDefault(); if (autoPlay) stopAuto(); else startAuto(); }
+});
+
+// ═══════════════════════════════════════
+// SLIDERS
+// ═══════════════════════════════════════
+
+const allInputs = {};
+
+const EYE_SLIDERS = [
+  { key: 'w',     label: 'width',  min: 4,   max: 80,  step: 1 },
+  { key: 'h',     label: 'height', min: 4,   max: 100, step: 1 },
+  { key: 'round', label: 'round',  min: 0,   max: 50,  step: 1 },
+  { key: 'x',     label: 'x off',  min: -20, max: 20,  step: 1 },
+  { key: 'y',     label: 'y off',  min: -40, max: 20,  step: 1 },
+  { key: 'tilt',  label: 'tilt',   min: -30, max: 30,  step: 1 },
+];
+
+const MOUTH_SLIDERS = [
+  { key: 'w',     label: 'width',  min: 4,   max: 60,  step: 1 },
+  { key: 'h',     label: 'height', min: 2,   max: 40,  step: 1 },
+  { key: 'y',     label: 'y off',  min: 10,  max: 65,  step: 1 },
+  { key: 'curve', label: 'curve',  min: -30, max: 30,  step: 1 },
+  { key: 'round', label: 'round',  min: 0,   max: 50,  step: 1 },
+  { key: 'show',  label: 'show',   min: 0,   max: 1,   step: 0.05 },
+  { key: 'open',  label: 'open',   min: 0,   max: 1,   step: 0.05 },
+];
+
+const FACE_SLIDERS = [
+  { key: 'x',      label: 'x off',  min: -20, max: 20,  step: 1 },
+  { key: 'y',      label: 'y off',  min: -20, max: 20,  step: 1 },
+  { key: 'tilt',   label: 'tilt',   min: -20, max: 20,  step: 1 },
+  { key: 'scale',  label: 'scale',  min: 0.7, max: 1.3, step: 0.01 },
+  { key: 'squash', label: 'squash', min: -0.5, max: 0.5, step: 0.02 },
+  { key: 'skewX',  label: 'skew X', min: -1,  max: 1,   step: 0.05 },
+  { key: 'skewY',  label: 'skew Y', min: -1,  max: 1,   step: 0.05 },
+];
+
+function buildSliders(containerId, sliders, targetPath, shapeOptions) {
+  const el = document.getElementById(containerId);
+  const inputs = {};
+
+  // Shape dropdown if provided
+  if (shapeOptions) {
+    const row = document.createElement('div');
+    row.className = 'sl-row';
+    row.innerHTML = `<label>shape</label><select>${shapeOptions.map(o => `<option value="${o}">${o}</option>`).join('')}</select><span class="sl-val"></span>`;
+    el.appendChild(row);
+    const sel = row.querySelector('select');
+    inputs._shape = sel;
+    sel.addEventListener('change', () => { getTarget(targetPath).shape = sel.value; });
+  }
+
+  sliders.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'sl-row';
+    const def = getTarget(targetPath)[s.key] ?? 0;
+    row.innerHTML = `<label>${s.label}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${def}"><span class="sl-val">${def}</span>`;
+    el.appendChild(row);
+    const input = row.querySelector('input');
+    const valEl = row.querySelector('.sl-val');
+    inputs[s.key] = { input, valEl };
+    input.addEventListener('input', () => {
+      const v = parseFloat(input.value);
+      valEl.textContent = typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : v;
+      getTarget(targetPath)[s.key] = v;
+    });
+  });
+
+  allInputs[containerId] = inputs;
+}
+
+function getTarget(path) {
+  return path.split('.').reduce((o, k) => o[k], target);
+}
+
+// Eye gap (shared)
+const eyesEl = document.getElementById('sl-eyes');
+const gapRow = document.createElement('div');
+gapRow.className = 'sl-row';
+gapRow.innerHTML = `<label>gap</label><input type="range" min="60" max="260" step="2" value="${NEUTRAL.eyeGap}"><span class="sl-val">${NEUTRAL.eyeGap}</span>`;
+eyesEl.appendChild(gapRow);
+const gapInput = gapRow.querySelector('input');
+const gapVal = gapRow.querySelector('.sl-val');
+gapInput.addEventListener('input', () => { target.eyeGap = parseFloat(gapInput.value); gapVal.textContent = gapInput.value; });
+allInputs.eyeGap = { input: gapInput, valEl: gapVal };
+
+buildSliders('sl-left-eye', EYE_SLIDERS, 'leftEye', eyeShapeNames);
+buildSliders('sl-right-eye', EYE_SLIDERS, 'rightEye', eyeShapeNames);
+buildSliders('sl-mouth', MOUTH_SLIDERS, 'mouth', mouthShapeNames);
+buildSliders('sl-face', FACE_SLIDERS, 'face');
+
+function syncAll() {
+  // Gap
+  allInputs.eyeGap.input.value = target.eyeGap;
+  allInputs.eyeGap.valEl.textContent = target.eyeGap;
+
+  // Sub-objects
+  syncGroup('sl-left-eye', target.leftEye);
+  syncGroup('sl-right-eye', target.rightEye);
+  syncGroup('sl-mouth', target.mouth);
+  syncGroup('sl-face', target.face);
+}
+
+function syncGroup(containerId, obj) {
+  const inputs = allInputs[containerId];
+  if (!inputs) return;
+  if (inputs._shape && obj.shape) inputs._shape.value = obj.shape;
+  for (const [k, ctrl] of Object.entries(inputs)) {
+    if (k === '_shape') continue;
+    const v = obj[k];
+    if (v !== undefined && ctrl.input) {
+      ctrl.input.value = v;
+      ctrl.valEl.textContent = typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : v;
+    }
+  }
+}
+
+// Mirror L→R
+document.getElementById('btn-mirror').addEventListener('click', () => {
+  target.rightEye = { ...target.leftEye };
+  syncAll();
+});
+
+// Copy
+document.getElementById('btn-copy').addEventListener('click', () => {
+  function diff(obj, def) {
+    const d = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== def[k]) d[k] = v;
+    }
+    return Object.keys(d).length ? d : null;
+  }
+
+  const out = {};
+  const le = diff(target.leftEye, DEFAULT_EYE);
+  const re = diff(target.rightEye, DEFAULT_EYE);
+  const mo = diff(target.mouth, DEFAULT_MOUTH);
+  const bo = diff(target.face, DEFAULT_FACE);
+
+  if (target.eyeGap !== NEUTRAL.eyeGap) out.eyeGap = target.eyeGap;
+
+  // Check if eyes are same
+  const symmetric = JSON.stringify(le) === JSON.stringify(re);
+
+  if (symmetric && le) {
+    out.comment = 'symmetric';
+    out.leftEye = le;
+    out.rightEye = le;
+  } else {
+    if (le) out.leftEye = le;
+    if (re) out.rightEye = re;
+  }
+  if (mo) out.mouth = mo;
+  if (bo) out.face = bo;
+
+  const str = JSON.stringify(out, null, 2);
+  navigator.clipboard.writeText(str).then(() => {
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = 'copied!';
+    setTimeout(() => btn.textContent = 'copy values', 1200);
+  });
+});
+
+// ── Reactions playback ──
+
+const REACTIONS = {
+  attention: [
+    { expr: 'look_bl',   duration: 500 },
+    { expr: 'look_tl',   duration: 400 },
+    { expr: 'look_tr',   duration: 450 },
+    { expr: 'look_br',   duration: 400 },
+    { expr: 'idle',      duration: 600 },
+  ],
+  greet: [
+    { expr: 'surprise',  duration: 250 },
+    { expr: 'excited',   duration: 400 },
+    { expr: 'happy',     duration: 600 },
+  ],
+  goodnight: [
+    { expr: 'happy',     duration: 400 },
+    { expr: 'sleepy',    duration: 800 },
+  ],
+  sleep: [
+    { expr: 'yawn',      duration: 1000 },
+    { expr: 'sleepy',    duration: 1200 },
+  ],
+  game_start: [
+    { expr: 'surprise',  duration: 200 },
+    { expr: 'starry',    duration: 600 },
+    { expr: 'excited',   duration: 500 },
+  ],
+  surprised: [
+    { expr: 'surprise',  duration: 300 },
+    { expr: 'excited',   duration: 500 },
+  ],
+  love: [
+    { expr: 'surprise',  duration: 200 },
+    { expr: 'love',      duration: 800 },
+    { expr: 'happy',     duration: 500 },
+  ],
+  child_laughed: [
+    { expr: 'surprise',  duration: 200 },
+    { expr: 'happy',     duration: 400 },
+    { expr: 'silly',     duration: 600 },
+  ],
+  child_sad: [
+    { expr: 'sad',       duration: 400 },
+    { expr: 'love',      duration: 600 },
+  ],
+  child_scared: [
+    { expr: 'scared',    duration: 300 },
+    { expr: 'love',      duration: 500 },
+  ],
+  child_angry: [
+    { expr: 'surprise',  duration: 200 },
+    { expr: 'sad',       duration: 400 },
+  ],
+  curious_loop: [
+    { expr: 'curious',   duration: 900 },
+    { expr: 'curious_b', duration: 600 },
+    { expr: 'curious',   duration: 1100 },
+    { expr: 'curious_b', duration: 700 },
+    { expr: 'curious',   duration: 500 },
+  ],
+  thinking: [
+    { expr: 'thinking',  duration: 1500 },
+  ],
+  embarrassed: [
+    { expr: 'embarrassed', duration: 800 },
+    { expr: 'silly',      duration: 400 },
+  ],
+  shaken: [
+    { expr: 'dizzy',     duration: 600 },
+    { expr: 'silly',     duration: 400 },
+  ],
+  long_silence: [
+    { expr: 'bored',     duration: 2000 },
+    { expr: 'yawn',      duration: 1200 },
+    { expr: 'sleepy',    duration: 800 },
+  ],
+};
+
+let reactionSeq = null;
+let reactionIdx = 0;
+let reactionTimer = 0;
+
+// Inject into loop
+const _origLoop = loop;
+
+function loopWithReactions(now) {
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+
+  if (reactionSeq) {
+    reactionTimer += dt * 1000;
+    const frame = reactionSeq[reactionIdx];
+    if (reactionTimer >= frame.duration) {
+      reactionTimer = 0;
+      reactionIdx++;
+      if (reactionIdx >= reactionSeq.length) {
+        reactionSeq = null;
+        // Return to current expression
+        target = resolve(names[currentIdx]);
+      } else {
+        target = resolve(reactionSeq[reactionIdx].expr);
+      }
+    }
+  }
+}
+
+// Patch into the existing loop by adding reaction update before draw
+const origRAF = requestAnimationFrame;
+// We need to hook into the existing loop - let's use a simpler approach
+let reactionActive = false;
+
+function playReaction(name) {
+  const seq = REACTIONS[name];
+  if (!seq) return;
+  reactionSeq = seq;
+  reactionIdx = 0;
+  reactionTimer = 0;
+  reactionActive = true;
+  target = resolve(seq[0].expr);
+  stopAuto();
+}
+
+// Update reactions in the existing animation by patching lerpObj call timing
+// We'll check reactions every frame via a secondary rAF
+function reactionTick() {
+  if (!reactionSeq) { requestAnimationFrame(reactionTick); return; }
+
+  const now = performance.now();
+  const dt = 16; // approximate frame time in ms
+  reactionTimer += dt;
+  const frame = reactionSeq[reactionIdx];
+
+  if (reactionTimer >= frame.duration) {
+    reactionTimer = 0;
+    reactionIdx++;
+    if (reactionIdx >= reactionSeq.length) {
+      // Hold last frame — don't snap back
+      reactionSeq = null;
+    } else {
+      target = resolve(reactionSeq[reactionIdx].expr);
+    }
+  }
+
+  requestAnimationFrame(reactionTick);
+}
+requestAnimationFrame(reactionTick);
+
+// Build reaction buttons
+const reactionGrid = document.getElementById('reaction-grid');
+Object.keys(REACTIONS).forEach(name => {
+  const btn = document.createElement('button');
+  btn.className = 'grid-btn';
+  btn.textContent = name.replace(/_/g, ' ');
+  btn.addEventListener('click', () => playReaction(name));
+  reactionGrid.appendChild(btn);
+});
+
+// Init
+selectExpr(0);
+</script>
+</body>
+</html>

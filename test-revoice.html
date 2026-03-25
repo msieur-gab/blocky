@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Re-Voice Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+  h1 { font-size: 16px; padding: 8px 0; }
+  h2 {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 12px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+
+  .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .row label { font-size: 11px; color: #888; min-width: 80px; text-align: right; }
+  .row input[type="range"] { flex: 1; max-width: 200px; }
+  .row .val { font-size: 11px; font-weight: 600; min-width: 44px; }
+
+  .btn {
+    padding: 10px 24px; font: inherit; font-size: 13px;
+    border: 1px solid #ddd; border-radius: 8px;
+    background: #fff; cursor: pointer;
+  }
+  .btn:hover { background: #eee; }
+  .btn-rec { background: #ef4444; color: #fff; border-color: #ef4444; }
+  .btn-rec:hover { background: #dc2626; }
+  .btn-rec.recording { animation: pulse-rec 0.8s ease-in-out infinite; }
+  .btn-play { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .btn-play:hover { background: #2563eb; }
+  .btn-play:disabled { opacity: 0.3; cursor: default; }
+
+  @keyframes pulse-rec { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .actions { display: flex; gap: 8px; justify-content: center; padding: 12px 0; flex-wrap: wrap; }
+
+  #status {
+    text-align: center; font-size: 12px; color: #888; padding: 8px 0;
+    min-height: 24px;
+  }
+
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px; padding: 8px 0;
+  }
+  .preset-btn {
+    padding: 8px; font: inherit; font-size: 11px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer; text-align: center;
+  }
+  .preset-btn:hover { background: #eee; }
+  .preset-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <h1>Re-Voice Test</h1>
+  <p style="font-size:12px;color:#888;padding-bottom:12px;">Record a word, hear it back in Blocky's voice. Tune the filters until it sounds like Blocky.</p>
+
+  <div class="actions">
+    <button class="btn btn-rec" id="btn-rec">hold to record</button>
+    <button class="btn btn-play" id="btn-original" disabled>play original</button>
+    <button class="btn btn-play" id="btn-blocky" disabled>play as Blocky</button>
+  </div>
+
+  <div id="status">tap and hold to record a word</div>
+
+  <h2>Voice presets</h2>
+  <div class="preset-grid" id="presets"></div>
+
+  <h2>Filter chain</h2>
+
+  <div class="row"><label>pitch (semitones)</label><input type="range" id="f-pitch" min="-12" max="24" step="1" value="8"><span class="val" id="fv-pitch">8</span></div>
+  <div class="row"><label>speed</label><input type="range" id="f-speed" min="0.5" max="2" step="0.05" value="1"><span class="val" id="fv-speed">1</span></div>
+  <div class="row"><label>formant freq</label><input type="range" id="f-formant" min="100" max="6000" step="10" value="700"><span class="val" id="fv-formant">700</span></div>
+  <div class="row"><label>formant Q</label><input type="range" id="f-formantQ" min="0.1" max="20" step="0.1" value="2.5"><span class="val" id="fv-formantQ">2.5</span></div>
+  <div class="row"><label>formant 2</label><input type="range" id="f-formant2" min="100" max="8000" step="10" value="1400"><span class="val" id="fv-formant2">1400</span></div>
+  <div class="row"><label>formant 2 Q</label><input type="range" id="f-formant2Q" min="0.1" max="20" step="0.1" value="2"><span class="val" id="fv-formant2Q">2</span></div>
+  <div class="row"><label>vibrato rate</label><input type="range" id="f-vibRate" min="0" max="30" step="0.5" value="6"><span class="val" id="fv-vibRate">6</span></div>
+  <div class="row"><label>vibrato depth</label><input type="range" id="f-vibDepth" min="0" max="200" step="1" value="30"><span class="val" id="fv-vibDepth">30</span></div>
+  <div class="row"><label>lowpass</label><input type="range" id="f-lowpass" min="500" max="20000" step="50" value="20000"><span class="val" id="fv-lowpass">20000</span></div>
+  <div class="row"><label>distortion</label><input type="range" id="f-distort" min="0" max="100" step="1" value="0"><span class="val" id="fv-distort">0</span></div>
+  <div class="row"><label>highpass</label><input type="range" id="f-highpass" min="0" max="5000" step="10" value="0"><span class="val" id="fv-highpass">0</span></div>
+  <div class="row"><label>reverb</label><input type="range" id="f-reverb" min="0" max="1" step="0.05" value="0"><span class="val" id="fv-reverb">0</span></div>
+  <div class="row"><label>reverb decay</label><input type="range" id="f-reverbDecay" min="0.1" max="3" step="0.1" value="0.5"><span class="val" id="fv-reverbDecay">0.5</span></div>
+
+  <div class="actions">
+    <button class="btn" id="btn-copy">copy settings</button>
+  </div>
+</div>
+
+<script>
+let audioCtx = null;
+let recordedBuffer = null;
+let mediaStream = null;
+let isRecording = false;
+let recorder = null;
+let chunks = [];
+
+// ── Init audio ──
+function ensureCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// ── Slider wiring ──
+const params = {};
+document.querySelectorAll('input[type="range"]').forEach(input => {
+  const key = input.id.replace('f-', '');
+  const valEl = document.getElementById('fv-' + key);
+  params[key] = parseFloat(input.value);
+  input.addEventListener('input', () => {
+    params[key] = parseFloat(input.value);
+    valEl.textContent = input.value;
+  });
+});
+
+// ── Presets ──
+const PRESETS = {
+  'creature high': { pitch: 10, speed: 1, formant: 800, formantQ: 3, formant2: 1600, formant2Q: 2, vibRate: 8, vibDepth: 40, lowpass: 4000, distort: 0, highpass: 200, reverb: 0.15, reverbDecay: 0.4 },
+  'creature mid': { pitch: 6, speed: 1, formant: 700, formantQ: 2.5, formant2: 1400, formant2Q: 2, vibRate: 6, vibDepth: 30, lowpass: 3500, distort: 0, highpass: 100, reverb: 0.1, reverbDecay: 0.3 },
+  'breathe in': { pitch: 8, speed: 1, formant: 3390, formantQ: 12.9, formant2: 4000, formant2Q: 3, vibRate: 14, vibDepth: 56, lowpass: 6000, distort: 0, highpass: 3000, reverb: 0.3, reverbDecay: 0.8 },
+  'breathe out': { pitch: 6, speed: 1, formant: 3840, formantQ: 0.1, formant2: 4500, formant2Q: 1, vibRate: 20, vibDepth: 74, lowpass: 8000, distort: 0, highpass: 3000, reverb: 0.3, reverbDecay: 1.0 },
+  'robot': { pitch: 3, speed: 1, formant: 600, formantQ: 5, formant2: 1200, formant2Q: 4, vibRate: 0, vibDepth: 0, lowpass: 3000, distort: 40, highpass: 200, reverb: 0.05, reverbDecay: 0.2 },
+  'tiny alien': { pitch: 14, speed: 1, formant: 1000, formantQ: 4, formant2: 2000, formant2Q: 3, vibRate: 12, vibDepth: 60, lowpass: 5000, distort: 0, highpass: 300, reverb: 0.2, reverbDecay: 0.5 },
+  'baby monster': { pitch: 8, speed: 1, formant: 500, formantQ: 3, formant2: 1000, formant2Q: 2, vibRate: 5, vibDepth: 20, lowpass: 2500, distort: 10, highpass: 80, reverb: 0.15, reverbDecay: 0.4 },
+  'chipmunk': { pitch: 12, speed: 0.65, formant: 1200, formantQ: 2, formant2: 2400, formant2Q: 1.5, vibRate: 3, vibDepth: 15, lowpass: 6000, distort: 0, highpass: 400, reverb: 0.1, reverbDecay: 0.3 },
+  'deep creature': { pitch: -4, speed: 1, formant: 400, formantQ: 3, formant2: 800, formant2Q: 2.5, vibRate: 4, vibDepth: 25, lowpass: 2000, distort: 5, highpass: 0, reverb: 0.2, reverbDecay: 0.6 },
+  'wobble bot': { pitch: 7, speed: 1, formant: 650, formantQ: 4, formant2: 1300, formant2Q: 3, vibRate: 15, vibDepth: 80, lowpass: 3000, distort: 20, highpass: 150, reverb: 0.1, reverbDecay: 0.3 },
+};
+
+const presetsEl = document.getElementById('presets');
+Object.entries(PRESETS).forEach(([name, preset]) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    // Apply preset to sliders
+    Object.entries(preset).forEach(([key, val]) => {
+      params[key] = val;
+      const input = document.getElementById('f-' + key);
+      const valEl = document.getElementById('fv-' + key);
+      if (input) { input.value = val; valEl.textContent = val; }
+    });
+    // Highlight active
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // Auto-play if we have a recording
+    if (recordedBuffer) playAsBlocky();
+  });
+  presetsEl.appendChild(btn);
+});
+
+// ── Recording ──
+const btnRec = document.getElementById('btn-rec');
+const btnOriginal = document.getElementById('btn-original');
+const btnBlocky = document.getElementById('btn-blocky');
+const statusEl = document.getElementById('status');
+
+async function startRecording() {
+  ensureCtx();
+  if (!mediaStream) {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+  chunks = [];
+  recorder = new MediaRecorder(mediaStream);
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    const arrayBuf = await blob.arrayBuffer();
+    recordedBuffer = await audioCtx.decodeAudioData(arrayBuf);
+    btnOriginal.disabled = false;
+    btnBlocky.disabled = false;
+    statusEl.textContent = `recorded ${recordedBuffer.duration.toFixed(2)}s — tap play`;
+  };
+  recorder.start();
+  isRecording = true;
+  btnRec.classList.add('recording');
+  statusEl.textContent = 'recording...';
+}
+
+function stopRecording() {
+  if (recorder && isRecording) {
+    recorder.stop();
+    isRecording = false;
+    btnRec.classList.remove('recording');
+  }
+}
+
+// Hold to record
+btnRec.addEventListener('mousedown', startRecording);
+btnRec.addEventListener('mouseup', stopRecording);
+btnRec.addEventListener('mouseleave', stopRecording);
+btnRec.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+btnRec.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+// ── Play original ──
+btnOriginal.addEventListener('click', () => {
+  if (!recordedBuffer) return;
+  const ctx = ensureCtx();
+  const src = ctx.createBufferSource();
+  src.buffer = recordedBuffer;
+  src.connect(ctx.destination);
+  src.start();
+  statusEl.textContent = 'playing original';
+});
+
+// ── Play as Blocky ──
+// Pitch shift: render at shifted rate into offline context
+// Output length compensates so pitch changes without speed change
+// Speed param then applies on top
+async function pitchShiftBuffer(buffer, semitones, speed) {
+  const pitchRate = Math.pow(2, semitones / 12);
+  const totalRate = pitchRate * speed;
+  // Render at totalRate — output will be shorter/longer
+  const newLength = Math.max(1, Math.floor(buffer.length / totalRate));
+  const offline = new OfflineAudioContext(buffer.numberOfChannels, newLength, buffer.sampleRate);
+  const src = offline.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = totalRate;
+  src.connect(offline.destination);
+  src.start();
+  return offline.startRendering();
+}
+
+async function playAsBlocky() {
+  if (!recordedBuffer) return;
+  const ctx = ensureCtx();
+  statusEl.textContent = 'processing...';
+
+  // Pitch shift: semitones change pitch, speed=1 keeps original tempo
+  const shifted = await pitchShiftBuffer(recordedBuffer, params.pitch, params.speed || 1);
+
+  const src = ctx.createBufferSource();
+  src.buffer = shifted;
+
+  // Build filter chain
+  let chain = src;
+
+  // Highpass (remove low rumble)
+  if (params.highpass > 0) {
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = params.highpass;
+    chain.connect(hp);
+    chain = hp;
+  }
+
+  // Formant 1 (primary vocal character)
+  const f1 = ctx.createBiquadFilter();
+  f1.type = 'bandpass';
+  f1.frequency.value = params.formant;
+  f1.Q.value = params.formantQ;
+
+  // Formant 2 (secondary resonance)
+  const f2 = ctx.createBiquadFilter();
+  f2.type = 'bandpass';
+  f2.frequency.value = params.formant2;
+  f2.Q.value = params.formant2Q;
+
+  // Mix both formants
+  const formantMix = ctx.createGain();
+  formantMix.gain.value = 1;
+
+  const f2Gain = ctx.createGain();
+  f2Gain.gain.value = 0.5;
+
+  chain.connect(f1).connect(formantMix);
+  chain.connect(f2).connect(f2Gain).connect(formantMix);
+
+  chain = formantMix;
+
+  // Distortion (optional waveshaper)
+  if (params.distort > 0) {
+    const ws = ctx.createWaveShaper();
+    const amount = params.distort;
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 128) - 1;
+      curve[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x));
+    }
+    ws.curve = curve;
+    ws.oversample = '2x';
+    chain.connect(ws);
+    chain = ws;
+  }
+
+  // Lowpass
+  if (params.lowpass < 19000) {
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = params.lowpass;
+    chain.connect(lp);
+    chain = lp;
+  }
+
+  // Vibrato (simulated via delay modulation)
+  if (params.vibRate > 0 && params.vibDepth > 0) {
+    const delay = ctx.createDelay(0.1);
+    delay.delayTime.value = 0.005;
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.value = params.vibRate;
+    lfoGain.gain.value = params.vibDepth * 0.00001;
+    lfo.connect(lfoGain).connect(delay.delayTime);
+    lfo.start();
+    chain.connect(delay);
+    chain = delay;
+    src.onended = () => lfo.stop();
+  }
+
+  // Final gain (boost to compensate filter loss)
+  const gain = ctx.createGain();
+  gain.gain.value = 3;
+  chain.connect(gain);
+  chain = gain;
+
+  // Reverb (convolution-based)
+  if (params.reverb > 0) {
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+    dry.gain.value = 1;
+    wet.gain.value = params.reverb;
+
+    // Generate impulse response
+    const len = Math.floor(ctx.sampleRate * params.reverbDecay);
+    const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * 0.3));
+      }
+    }
+    const convolver = ctx.createConvolver();
+    convolver.buffer = impulse;
+
+    chain.connect(dry).connect(ctx.destination);
+    chain.connect(convolver).connect(wet).connect(ctx.destination);
+  } else {
+    chain.connect(ctx.destination);
+  }
+
+  src.start();
+  statusEl.textContent = 'playing as Blocky';
+}
+
+btnBlocky.addEventListener('click', playAsBlocky);
+
+// ── Copy settings ──
+document.getElementById('btn-copy').addEventListener('click', () => {
+  const str = JSON.stringify(params, null, 2);
+  navigator.clipboard.writeText(str).then(() => {
+    document.getElementById('btn-copy').textContent = 'copied!';
+    setTimeout(() => document.getElementById('btn-copy').textContent = 'copy settings', 1200);
+  });
+});
+</script>
+</body>
+</html>

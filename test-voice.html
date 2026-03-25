@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Voice Workbench</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 700px; margin: 0 auto;
+    padding: 12px; gap: 8px;
+  }
+
+  #screen {
+    width: 100%; aspect-ratio: 2.2 / 1;
+    background: #0a0a0f; border-radius: 12px;
+    overflow: hidden; flex-shrink: 0;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  h2 {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 8px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+
+  #panels { flex: 1; overflow-y: auto; }
+
+  /* Sound buttons */
+  .sound-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 4px; padding: 6px 0;
+  }
+  .sound-btn {
+    padding: 8px 4px; font: inherit; font-size: 11px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer; text-align: center;
+    transition: all 0.15s;
+  }
+  .sound-btn:hover { background: #eee; }
+  .sound-btn:active { background: #3b82f6; color: #fff; }
+
+  /* Reaction rows */
+  .reaction-block {
+    margin: 8px 0; padding: 8px;
+    background: #fff; border-radius: 8px;
+    border: 1px solid #e0e0e0;
+  }
+  .reaction-name {
+    font-size: 12px; font-weight: 700; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .reaction-play {
+    padding: 3px 12px; font: inherit; font-size: 10px;
+    border: 1px solid #3b82f6; border-radius: 4px;
+    background: #3b82f6; color: #fff; cursor: pointer;
+  }
+  .reaction-play:hover { background: #2563eb; }
+  .beat-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 0; font-size: 11px;
+  }
+  .beat-expr { color: #888; min-width: 80px; }
+  .beat-dur { color: #888; min-width: 45px; text-align: right; }
+  .beat-sound {
+    flex: 1; font: inherit; font-size: 11px;
+    padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px;
+  }
+  .beat-test {
+    padding: 2px 8px; font: inherit; font-size: 10px;
+    border: 1px solid #ddd; border-radius: 4px;
+    background: #fff; cursor: pointer;
+  }
+  .beat-test:hover { background: #eee; }
+
+  /* Now playing indicator */
+  .beat-row.playing { background: rgba(59, 130, 246, 0.08); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="screen"><canvas id="face"></canvas></div>
+
+  <div id="panels">
+    <h2>Sounds — tap to preview</h2>
+    <div id="sound-grid" class="sound-grid"></div>
+
+    <h2>Blocky TTS — creature speech</h2>
+    <div id="tts-section" style="padding:8px 0;">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;">
+        <input type="text" id="tts-word" placeholder="type a word..." style="font:inherit;font-size:13px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;flex:1;min-width:120px;">
+        <button class="sound-btn" id="tts-speak" style="padding:8px 16px;">speak</button>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;padding:6px 0;flex-wrap:wrap;">
+        <label style="font-size:11px;color:#888;">pitch <input type="range" id="tts-pitch" min="0.1" max="2" step="0.1" value="1.8" style="width:80px;"> <span id="tts-pitch-val">1.8</span></label>
+        <label style="font-size:11px;color:#888;">rate <input type="range" id="tts-rate" min="0.5" max="3" step="0.1" value="1.4" style="width:80px;"> <span id="tts-rate-val">1.4</span></label>
+        <label style="font-size:11px;color:#888;"><input type="checkbox" id="tts-babble" checked> pre-babble</label>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;padding:4px 0;">
+        <button class="sound-btn tts-quick" data-word="blocky">blocky</button>
+        <button class="sound-btn tts-quick" data-word="hello">hello</button>
+        <button class="sound-btn tts-quick" data-word="sleep">sleep</button>
+        <button class="sound-btn tts-quick" data-word="game">game</button>
+        <button class="sound-btn tts-quick" data-word="mama">mama</button>
+        <button class="sound-btn tts-quick" data-word="papa">papa</button>
+        <button class="sound-btn tts-quick" data-word="love">love</button>
+        <button class="sound-btn tts-quick" data-word="funny">funny</button>
+        <button class="sound-btn tts-quick" data-word="no">no</button>
+        <button class="sound-btn tts-quick" data-word="yay">yay</button>
+      </div>
+    </div>
+
+    <h2>Reactions — assign sounds to beats</h2>
+    <div id="reactions"></div>
+  </div>
+</div>
+
+<script type="module">
+import { list as listExpressions, resolve, NEUTRAL, DEFAULT_EYE, DEFAULT_MOUTH, DEFAULT_FACE } from './js/expressions.js';
+import { eyes as eyeShapes, mouths as mouthShapes } from './js/shapes.js';
+import { lerp } from './js/utils/math.js';
+import { sounds, list as listSounds, play, speak, init as initVoice, resume } from './js/services/voice.js';
+
+// ── Audio context init on first click ──
+let audioReady = false;
+document.addEventListener('click', () => {
+  if (!audioReady) { initVoice(); audioReady = true; }
+  resume();
+}, { once: false });
+
+// ══════════════════════════════════════════
+// FACE RENDERER (same as test-expressions)
+// ══════════════════════════════════════════
+
+const canvas = document.getElementById('face');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy, scale;
+let target = resolve('idle');
+let face = resolve('idle');
+let blinkAmt = 0, blinkPhase = 0, blinkTimer = 3, breathPhase = 0;
+let blinksRemaining = 0, blinkPause = 0;
+
+function resize() {
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  W = parent.clientWidth; H = parent.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx = W / 2; cy = H / 2;
+  scale = Math.min(W, H) / 280;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function lerpObj(cur, tgt, spd, dt) {
+  for (const k of Object.keys(tgt)) {
+    if (typeof tgt[k] === 'number' && typeof cur[k] === 'number') cur[k] = lerp(cur[k], tgt[k], spd * dt);
+    else if (typeof tgt[k] === 'string') cur[k] = tgt[k];
+  }
+}
+
+function roundRect(ctx, w, h, r) {
+  r = Math.min(r, w, h);
+  ctx.beginPath();
+  ctx.moveTo(-w + r, -h); ctx.lineTo(w - r, -h);
+  ctx.quadraticCurveTo(w, -h, w, -h + r); ctx.lineTo(w, h - r);
+  ctx.quadraticCurveTo(w, h, w - r, h); ctx.lineTo(-w + r, h);
+  ctx.quadraticCurveTo(-w, h, -w, h - r); ctx.lineTo(-w, -h + r);
+  ctx.quadraticCurveTo(-w, -h, -w + r, -h); ctx.closePath();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const fg = '#d7d0c8', bg = '#0a0a0f';
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const breath = Math.sin(breathPhase) * 2 * scale;
+  const skX = face.face.skewX || 0;
+  const skY = face.face.skewY || 0;
+  ctx.save();
+  ctx.translate(cx + face.face.x * scale, cy + face.face.y * scale + breath);
+  ctx.rotate(face.face.tilt * Math.PI / 180);
+  const sx = face.face.scale * (1 - face.face.squash * 0.15);
+  const sy = face.face.scale * (1 + face.face.squash * 0.15);
+  ctx.scale(sx, sy);
+
+  const gap = face.eyeGap * scale / 2;
+
+  [{ side: -1, eye: face.leftEye }, { side: 1, eye: face.rightEye }].forEach(({ side, eye }) => {
+    const ps = 1 + skX * side * 0.4;
+    const ew = eye.w * scale / 2 * ps;
+    let eh = eye.h * scale / 2 * ps;
+    eh = eh * (1 - blinkAmt * 0.92);
+    eh = Math.max(1.5 * scale, eh);
+    const pShift = skX * side * -8 * scale;
+    const ex = side * gap + (eye.x || 0) * scale + pShift;
+    const ey = (eye.y || 0) * scale + skY * side * -4 * scale;
+    const tilt = (eye.tilt || 0) * side * Math.PI / 180;
+    const r = (eye.round || 0) * scale / 2 * ps;
+
+    ctx.save();
+    ctx.translate(ex, ey); ctx.rotate(tilt);
+    ctx.fillStyle = fg; ctx.strokeStyle = fg;
+    ctx.lineWidth = 3 * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (blinkAmt < 0.8) { const fn = eyeShapes[eye.shape] || eyeShapes.pill; fn(ctx, ew, eh, r); }
+    ctx.restore();
+  });
+
+  if (blinkAmt > 0.8) {
+    ctx.strokeStyle = fg; ctx.lineWidth = 2.5 * scale; ctx.lineCap = 'round';
+    [{ side: -1, eye: face.leftEye }, { side: 1, eye: face.rightEye }].forEach(({ side, eye }) => {
+      const ps = 1 + skX * side * 0.4;
+      const ew = eye.w * scale / 2 * ps;
+      const pShift = skX * side * -8 * scale;
+      const ex = side * gap + (eye.x || 0) * scale + pShift;
+      const ey = (eye.y || 0) * scale + skY * side * -4 * scale;
+      ctx.beginPath(); ctx.moveTo(ex - ew * 0.7, ey); ctx.lineTo(ex + ew * 0.7, ey); ctx.stroke();
+    });
+  }
+
+  if (face.mouth.show > 0.01) {
+    const m = face.mouth;
+    const mw = m.w * scale / 2, mh = m.h * scale / 2, my = m.y * scale;
+    ctx.save();
+    ctx.translate(skX * -6 * scale, my + skY * -3 * scale);
+    ctx.globalAlpha = m.show; ctx.fillStyle = fg; ctx.strokeStyle = fg;
+    ctx.lineWidth = 2.5 * scale; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const fn = mouthShapes[m.shape] || mouthShapes.none;
+    fn(ctx, mw, mh, { curve: (m.curve || 0) * scale, open: m.open || 0, round: (m.round || 2) * scale / 2 });
+    ctx.globalAlpha = 1; ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ── Loop ──
+let lastT = 0;
+function loop(now) {
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+  lastT = now;
+
+  face.eyeGap = lerp(face.eyeGap, target.eyeGap, 4 * dt);
+  lerpObj(face.leftEye, target.leftEye, 4, dt);
+  lerpObj(face.rightEye, target.rightEye, 4, dt);
+  lerpObj(face.mouth, target.mouth, 4, dt);
+  lerpObj(face.face, target.face, 4, dt);
+
+  // Blink
+  blinkTimer -= dt;
+  if (blinkPhase === 0) {
+    if (blinkPause > 0) { blinkPause -= dt; if (blinkPause <= 0) blinkPhase = 1; }
+    else if (blinkTimer <= 0) { blinksRemaining = Math.random() < 0.3 ? 2 : 1; blinkPhase = 1; }
+  }
+  const isDouble = blinksRemaining > 0;
+  if (blinkPhase === 1) { blinkAmt = Math.min(1, blinkAmt + dt * (isDouble ? 28 : 16)); if (blinkAmt >= 1) blinkPhase = 2; }
+  else if (blinkPhase === 2) {
+    blinkAmt = Math.max(0, blinkAmt - dt * (isDouble ? 22 : 12));
+    if (blinkAmt <= 0) { blinkAmt = 0; blinkPhase = 0; blinksRemaining--; if (blinksRemaining > 0) blinkPause = 0.04 + Math.random() * 0.03; else blinkTimer = 2 + Math.random() * 4; }
+  }
+  breathPhase += dt * 1.2;
+
+  // Reaction playback
+  tickReaction(dt);
+
+  draw();
+  requestAnimationFrame(loop);
+}
+lastT = performance.now();
+requestAnimationFrame(loop);
+
+// ══════════════════════════════════════════
+// REACTIONS with sound assignments
+// ══════════════════════════════════════════
+
+const REACTIONS = {
+  attention: [
+    { expr: 'look_bl',   duration: 500,  sound: '' },
+    { expr: 'look_tl',   duration: 400,  sound: '' },
+    { expr: 'look_tr',   duration: 450,  sound: '' },
+    { expr: 'look_br',   duration: 400,  sound: '' },
+    { expr: 'idle',      duration: 600,  sound: '' },
+  ],
+  greet: [
+    { expr: 'surprise',  duration: 250,  sound: '' },
+    { expr: 'excited',   duration: 400,  sound: '' },
+    { expr: 'happy',     duration: 600,  sound: '' },
+  ],
+  goodnight: [
+    { expr: 'happy',     duration: 400,  sound: '' },
+    { expr: 'sleepy',    duration: 800,  sound: '' },
+  ],
+  sleep: [
+    { expr: 'yawn',      duration: 1000, sound: '' },
+    { expr: 'sleepy',    duration: 1200, sound: '' },
+  ],
+  game_start: [
+    { expr: 'surprise',  duration: 200,  sound: '' },
+    { expr: 'starry',    duration: 600,  sound: '' },
+    { expr: 'excited',   duration: 500,  sound: '' },
+  ],
+  surprised: [
+    { expr: 'surprise',  duration: 300,  sound: '' },
+    { expr: 'excited',   duration: 500,  sound: '' },
+  ],
+  love: [
+    { expr: 'surprise',  duration: 200,  sound: '' },
+    { expr: 'love',      duration: 800,  sound: '' },
+    { expr: 'happy',     duration: 500,  sound: '' },
+  ],
+  child_laughed: [
+    { expr: 'surprise',  duration: 200,  sound: '' },
+    { expr: 'happy',     duration: 400,  sound: '' },
+    { expr: 'silly',     duration: 600,  sound: '' },
+  ],
+  child_sad: [
+    { expr: 'sad',       duration: 400,  sound: '' },
+    { expr: 'love',      duration: 600,  sound: '' },
+  ],
+  child_scared: [
+    { expr: 'scared',    duration: 300,  sound: '' },
+    { expr: 'love',      duration: 500,  sound: '' },
+  ],
+  child_angry: [
+    { expr: 'surprise',  duration: 200,  sound: '' },
+    { expr: 'sad',       duration: 400,  sound: '' },
+  ],
+  curious_loop: [
+    { expr: 'curious',   duration: 900,  sound: '' },
+    { expr: 'curious_b', duration: 600,  sound: '' },
+    { expr: 'curious',   duration: 1100, sound: '' },
+    { expr: 'curious_b', duration: 700,  sound: '' },
+    { expr: 'curious',   duration: 500,  sound: '' },
+  ],
+  thinking: [
+    { expr: 'thinking',  duration: 1500, sound: '' },
+  ],
+  embarrassed: [
+    { expr: 'embarrassed', duration: 800, sound: '' },
+    { expr: 'silly',      duration: 400,  sound: '' },
+  ],
+  shaken: [
+    { expr: 'dizzy',     duration: 600,  sound: '' },
+    { expr: 'silly',     duration: 400,  sound: '' },
+  ],
+  long_silence: [
+    { expr: 'bored',     duration: 2000, sound: '' },
+    { expr: 'yawn',      duration: 1200, sound: '' },
+    { expr: 'sleepy',    duration: 800,  sound: '' },
+  ],
+};
+
+// Reaction playback state
+let currentReaction = null;
+let reactionName = '';
+let beatIdx = 0;
+let beatTimer = 0;
+let beatRows = [];
+
+function playReaction(name) {
+  const seq = REACTIONS[name];
+  if (!seq) return;
+  currentReaction = seq;
+  reactionName = name;
+  beatIdx = 0;
+  beatTimer = 0;
+  target = resolve(seq[0].expr);
+
+  // Play sound for first beat
+  if (seq[0].sound) play(seq[0].sound, seq[0].duration / 1000);
+
+  highlightBeat(name, 0);
+}
+
+function tickReaction(dt) {
+  if (!currentReaction) return;
+  beatTimer += dt * 1000;
+  const beat = currentReaction[beatIdx];
+
+  if (beatTimer >= beat.duration) {
+    beatTimer = 0;
+    beatIdx++;
+    if (beatIdx >= currentReaction.length) {
+      // Hold last frame
+      currentReaction = null;
+      highlightBeat(reactionName, -1);
+    } else {
+      target = resolve(currentReaction[beatIdx].expr);
+      const b = currentReaction[beatIdx];
+      if (b.sound) play(b.sound, b.duration / 1000);
+      highlightBeat(reactionName, beatIdx);
+    }
+  }
+}
+
+function highlightBeat(name, idx) {
+  document.querySelectorAll(`.beat-row[data-reaction="${name}"]`).forEach((row, i) => {
+    row.classList.toggle('playing', i === idx);
+  });
+}
+
+// ══════════════════════════════════════════
+// BUILD UI
+// ══════════════════════════════════════════
+
+const soundNames = listSounds();
+
+// Sound preview grid
+const soundGrid = document.getElementById('sound-grid');
+soundNames.forEach(name => {
+  const btn = document.createElement('button');
+  btn.className = 'sound-btn';
+  btn.textContent = name.replace(/_/g, ' ');
+  btn.addEventListener('click', () => play(name, 0.5));
+  soundGrid.appendChild(btn);
+});
+
+// ── TTS controls ──
+
+const ttsWord = document.getElementById('tts-word');
+const ttsPitch = document.getElementById('tts-pitch');
+const ttsRate = document.getElementById('tts-rate');
+const ttsBabble = document.getElementById('tts-babble');
+const ttsPitchVal = document.getElementById('tts-pitch-val');
+const ttsRateVal = document.getElementById('tts-rate-val');
+
+ttsPitch.addEventListener('input', () => ttsPitchVal.textContent = ttsPitch.value);
+ttsRate.addEventListener('input', () => ttsRateVal.textContent = ttsRate.value);
+
+function speakWord(word) {
+  speak(word, {
+    pitch: parseFloat(ttsPitch.value),
+    rate: parseFloat(ttsRate.value),
+    preBabble: ttsBabble.checked,
+  });
+}
+
+document.getElementById('tts-speak').addEventListener('click', () => {
+  if (ttsWord.value.trim()) speakWord(ttsWord.value.trim());
+});
+
+ttsWord.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && ttsWord.value.trim()) speakWord(ttsWord.value.trim());
+});
+
+document.querySelectorAll('.tts-quick').forEach(btn => {
+  btn.addEventListener('click', () => speakWord(btn.dataset.word));
+});
+
+// Reaction blocks with sound selectors
+const reactionsEl = document.getElementById('reactions');
+
+Object.entries(REACTIONS).forEach(([name, beats]) => {
+  const block = document.createElement('div');
+  block.className = 'reaction-block';
+
+  const header = document.createElement('div');
+  header.className = 'reaction-name';
+  header.innerHTML = `${name.replace(/_/g, ' ')} <button class="reaction-play">play</button>`;
+  header.querySelector('.reaction-play').addEventListener('click', () => playReaction(name));
+  block.appendChild(header);
+
+  beats.forEach((beat, i) => {
+    const row = document.createElement('div');
+    row.className = 'beat-row';
+    row.dataset.reaction = name;
+
+    const expr = document.createElement('span');
+    expr.className = 'beat-expr';
+    expr.textContent = beat.expr;
+
+    const dur = document.createElement('span');
+    dur.className = 'beat-dur';
+    dur.textContent = beat.duration + 'ms';
+
+    const sel = document.createElement('select');
+    sel.className = 'beat-sound';
+    sel.innerHTML = `<option value="">— no sound —</option>` +
+      soundNames.map(s => `<option value="${s}">${s.replace(/_/g, ' ')}</option>`).join('');
+    sel.value = beat.sound || '';
+    sel.addEventListener('change', () => { beat.sound = sel.value; });
+
+    const test = document.createElement('button');
+    test.className = 'beat-test';
+    test.textContent = '▶';
+    test.addEventListener('click', () => {
+      // Play just this beat (expression + sound)
+      target = resolve(beat.expr);
+      if (sel.value) play(sel.value, beat.duration / 1000);
+    });
+
+    row.append(expr, dur, sel, test);
+    block.appendChild(row);
+  });
+
+  // Export button
+  const exp = document.createElement('button');
+  exp.className = 'sound-btn';
+  exp.style.marginTop = '6px';
+  exp.textContent = 'copy config';
+  exp.addEventListener('click', () => {
+    const out = beats.map(b => ({
+      expr: b.expr,
+      duration: b.duration,
+      ...(b.sound ? { sound: b.sound } : {}),
+    }));
+    navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => {
+      exp.textContent = 'copied!';
+      setTimeout(() => exp.textContent = 'copy config', 1200);
+    });
+  });
+  block.appendChild(exp);
+
+  reactionsEl.appendChild(block);
+});
+</script>
+</body>
+</html>

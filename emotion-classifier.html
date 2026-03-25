@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>Companion · Emotion Classifier</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0b0b10; color: rgba(255,255,255,0.85);
+    font: 13px/1.4 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+
+  #start {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #0b0b10; gap: 16px; cursor: pointer;
+  }
+  #start .t { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 5px; text-transform: uppercase; }
+  #start .c {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    animation: p 2.5s ease-in-out infinite;
+  }
+  #start .c::after {
+    content:''; border-left: 12px solid rgba(255,255,255,0.2);
+    border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px;
+  }
+  #start .s { color: rgba(255,255,255,0.35); font-size: 11px; letter-spacing: 2px; text-align: center; }
+  @keyframes p { 0%,100%{transform:scale(1);opacity:.5} 50%{transform:scale(1.05);opacity:1} }
+
+  /* Layout: face top, diagnostics below, scrollable */
+  #app { display: none; height: 100%; flex-direction: column; }
+  #app.show { display: flex; }
+
+  #face-area {
+    flex: 0 0 auto; height: 38vh; min-height: 200px;
+    position: relative; overflow: hidden;
+  }
+  #face-area canvas { width: 100%; height: 100%; display: block; }
+
+  /* Emotion bar across middle */
+  #emo-bar {
+    flex: 0 0 auto; display: flex; height: 44px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    overflow-x: auto; gap: 0;
+  }
+  .emo-cell {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-width: 52px; padding: 2px 4px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    transition: background 0.3s;
+  }
+  .emo-cell.active { background: rgba(255,255,255,0.08); }
+  .emo-cell .emo-name { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .emo-cell .emo-val { font-size: 12px; color: rgba(255,255,255,0.3); transition: color 0.3s; }
+  .emo-cell.active .emo-val { color: rgba(255,255,255,0.9); }
+  .emo-cell.active .emo-name { color: rgba(255,255,255,0.75); }
+
+  /* Diagnostics scroll area */
+  #diag {
+    flex: 1; overflow-y: auto; padding: 10px 12px 80px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .section {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .section-title {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); margin-bottom: 8px;
+  }
+
+  /* Audio features */
+  .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .feat {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3px 0;
+  }
+  .feat-name { color: rgba(255,255,255,0.55); font-size: 12px; }
+  .feat-val { color: rgba(255,255,255,0.75); font-size: 12px; text-align: right; }
+  .feat-bar-wrap { width: 60px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-left: 8px; flex-shrink: 0; }
+  .feat-bar { height: 100%; border-radius: 2px; transition: width 0.15s; }
+
+  /* Transcript */
+  #transcript-box {
+    font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.5;
+    min-height: 24px; word-wrap: break-word;
+  }
+  #transcript-box .word { display: inline; }
+  #transcript-box .word.emo-match { color: rgba(255,180,120,0.9); }
+
+  /* Fusion output */
+  #fusion-output {
+    font-size: 13px; line-height: 1.6;
+    background: rgba(255,255,255,0.04); padding: 10px 12px;
+    border-radius: 4px; white-space: pre-wrap;
+    color: rgba(255,255,255,0.8);
+  }
+
+  /* State machine */
+  #state-output {
+    font-size: 13px; line-height: 1.6;
+    color: rgba(255,255,255,0.7);
+  }
+  .state-item { display: flex; justify-content: space-between; padding: 3px 0; }
+  .state-key { color: rgba(255,255,255,0.5); }
+  .state-val { color: rgba(255,255,255,0.85); }
+
+  /* Intent tags */
+  .intent-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .intent-tag {
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.4);
+    transition: all 0.3s;
+  }
+  .intent-tag.active {
+    border-color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.08);
+  }
+</style>
+</head>
+<body>
+
+<div id="start">
+  <div class="t">emotion classifier</div>
+  <div class="c"></div>
+  <div class="s">mic · speech · sensors<br>tap to start</div>
+</div>
+
+<div id="app">
+  <!-- Face -->
+  <div id="face-area"><canvas id="c"></canvas></div>
+
+  <!-- Emotion probability bar -->
+  <div id="emo-bar"></div>
+
+  <!-- Diagnostics -->
+  <div id="diag">
+
+    <!-- Audio Features -->
+    <div class="section">
+      <div class="section-title">1 · Audio Features</div>
+      <div class="feat-grid" id="audio-feats"></div>
+    </div>
+
+    <!-- Transcript + Lexicon -->
+    <div class="section">
+      <div class="section-title">2 · Speech Transcript</div>
+      <div id="transcript-box">waiting for speech…</div>
+    </div>
+
+    <!-- Text Emotion -->
+    <div class="section">
+      <div class="section-title">3 · Text Emotion Scores</div>
+      <div id="text-emo-scores"></div>
+    </div>
+
+    <!-- Fusion -->
+    <div class="section">
+      <div class="section-title">4 · Fusion Layer</div>
+      <div id="fusion-output">—</div>
+    </div>
+
+    <!-- Intent -->
+    <div class="section">
+      <div class="section-title">5 · Intent Detection</div>
+      <div class="intent-tags" id="intent-tags"></div>
+    </div>
+
+    <!-- Companion State -->
+    <div class="section">
+      <div class="section-title">6 · Companion State Machine</div>
+      <div id="state-output"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// EMOTION CATEGORIES
+// ══════════════════════════════════════════
+const EMOTIONS = ['happy','sad','scared','excited','bored','angry','calm','curious','silly'];
+const INTENTS = ['seeking_comfort','wants_game','asking_question','just_talking','distressed','laughing','whispering','shouting'];
+
+// ══════════════════════════════════════════
+// AUDIO FEATURE NAMES
+// ══════════════════════════════════════════
+const AUDIO_FEATURES = [
+  { key:'rms',      name:'Volume',       color:'rgba(255,200,100,0.5)', max:1 },
+  { key:'pitch',    name:'Pitch',        color:'rgba(100,200,255,0.5)', max:600 },
+  { key:'zcr',      name:'Zero Cross',   color:'rgba(200,100,255,0.5)', max:0.3 },
+  { key:'centroid', name:'Brightness',   color:'rgba(100,255,180,0.5)', max:4000 },
+  { key:'rate',     name:'Speech Rate',  color:'rgba(255,150,150,0.5)', max:8 },
+  { key:'flatness', name:'Tonal/Noise',  color:'rgba(180,180,255,0.5)', max:1 },
+];
+
+// ══════════════════════════════════════════
+// EMOTION WORD LEXICON (child-weighted)
+// ══════════════════════════════════════════
+const LEXICON = {
+  happy:   ['happy','fun','funny','laugh','yay','good','nice','great','love','like','play','cool','awesome','best','yeah','yes','haha','pretty','smile','wow'],
+  sad:     ['sad','cry','miss','hurt','want','home','mama','papa','gone','alone','scared','bad','hate','mean','ugly','pain','ow','ouch','tired','sick','boo'],
+  scared:  ['scared','afraid','dark','monster','needle','shot','scary','fear','no','dont','stop','please','help','worry','nervous','alone','night'],
+  excited: ['excited','wow','whoa','really','omg','cool','amazing','look','come','lets','go','fast','again','more','yay','super','wanna','yes'],
+  bored:   ['bored','boring','nothing','when','long','tired','ugh','sigh','whatever','same','again','waiting','slow','blah','meh','dumb'],
+  angry:   ['angry','mad','hate','stupid','unfair','mean','no','stop','dont','shut','leave','worst','ugh','dumb','break','fight','liar'],
+  calm:    ['okay','fine','alright','yeah','sure','good','nice','quiet','soft','gentle','easy','slow','breathe','rest','sleep','peaceful'],
+  curious: ['what','why','how','where','who','when','wonder','think','know','tell','show','really','true','mean','maybe','because','explain'],
+  silly:   ['silly','funny','poop','butt','fart','burp','haha','lol','weird','crazy','goofy','stinky','banana','chicken','pickle','wiggle','boop'],
+};
+
+// ══════════════════════════════════════════
+// BUILD UI
+// ══════════════════════════════════════════
+const emoBar = document.getElementById('emo-bar');
+EMOTIONS.forEach(e => {
+  const cell = document.createElement('div');
+  cell.className = 'emo-cell';
+  cell.id = `emo-${e}`;
+  cell.innerHTML = `<div class="emo-name">${e}</div><div class="emo-val" id="emo-v-${e}">0</div>`;
+  emoBar.appendChild(cell);
+});
+
+const audioFeatsEl = document.getElementById('audio-feats');
+AUDIO_FEATURES.forEach(f => {
+  audioFeatsEl.innerHTML += `
+    <div class="feat">
+      <span class="feat-name">${f.name}</span>
+      <div class="feat-bar-wrap"><div class="feat-bar" id="bar-${f.key}" style="background:${f.color}"></div></div>
+      <span class="feat-val" id="fv-${f.key}">—</span>
+    </div>`;
+});
+
+const intentTagsEl = document.getElementById('intent-tags');
+INTENTS.forEach(i => {
+  const tag = document.createElement('div');
+  tag.className = 'intent-tag';
+  tag.id = `int-${i}`;
+  tag.textContent = i.replace('_',' ');
+  intentTagsEl.appendChild(tag);
+});
+
+// ══════════════════════════════════════════
+// AUDIO ENGINE
+// ══════════════════════════════════════════
+let audioCtx, analyser, timeBuf, freqBuf, floatBuf;
+const audioState = { rms:0, pitch:0, zcr:0, centroid:0, rate:0, flatness:0 };
+let energyHistory = [];
+let syllableCount = 0;
+let lastSyllableTime = 0;
+let speechStartTime = 0;
+
+async function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.75;
+  src.connect(analyser);
+  timeBuf = new Uint8Array(analyser.frequencyBinCount);
+  freqBuf = new Uint8Array(analyser.frequencyBinCount);
+  floatBuf = new Float32Array(analyser.fftSize);
+}
+
+function extractAudioFeatures() {
+  if (!analyser) return;
+  const N = analyser.frequencyBinCount;
+  const sr = audioCtx.sampleRate;
+
+  // Time domain
+  analyser.getByteTimeDomainData(timeBuf);
+  analyser.getFloatTimeDomainData(floatBuf);
+  analyser.getByteFrequencyData(freqBuf);
+
+  // 1. RMS Energy
+  let sum = 0;
+  for (let i = 0; i < timeBuf.length; i++) {
+    const v = (timeBuf[i] - 128) / 128;
+    sum += v * v;
+  }
+  audioState.rms = Math.min(1, Math.sqrt(sum / timeBuf.length) * 4);
+
+  // 2. Zero Crossing Rate
+  let crossings = 0;
+  for (let i = 1; i < floatBuf.length; i++) {
+    if ((floatBuf[i] >= 0) !== (floatBuf[i-1] >= 0)) crossings++;
+  }
+  audioState.zcr = crossings / floatBuf.length;
+
+  // 3. Pitch via autocorrelation (child range 150-500hz)
+  const minP = Math.floor(sr / 500);
+  const maxP = Math.floor(sr / 100);
+  let bestCorr = 0, bestOff = -1;
+  let rmsF = 0;
+  for (let i = 0; i < floatBuf.length; i++) rmsF += floatBuf[i] * floatBuf[i];
+  rmsF = Math.sqrt(rmsF / floatBuf.length);
+  
+  if (rmsF > 0.01) {
+    for (let off = minP; off < maxP && off < floatBuf.length / 2; off++) {
+      let corr = 0;
+      for (let i = 0; i < floatBuf.length - off; i++) corr += floatBuf[i] * floatBuf[i + off];
+      if (corr > bestCorr) { bestCorr = corr; bestOff = off; }
+    }
+  }
+  audioState.pitch = bestOff > 0 ? sr / bestOff : 0;
+
+  // 4. Spectral Centroid
+  let weightedSum = 0, magSum = 0;
+  for (let i = 0; i < N; i++) {
+    const freq = i * sr / (N * 2);
+    weightedSum += freq * freqBuf[i];
+    magSum += freqBuf[i];
+  }
+  audioState.centroid = magSum > 0 ? weightedSum / magSum : 0;
+
+  // 5. Spectral Flatness (geometric mean / arithmetic mean of magnitudes)
+  let logSum = 0, arithSum = 0, count = 0;
+  for (let i = 1; i < N / 4; i++) {
+    const v = Math.max(0.001, freqBuf[i]);
+    logSum += Math.log(v);
+    arithSum += v;
+    count++;
+  }
+  const geoMean = Math.exp(logSum / count);
+  const ariMean = arithSum / count;
+  audioState.flatness = ariMean > 0 ? Math.min(1, geoMean / ariMean) : 0;
+
+  // 6. Speech Rate (syllable estimation from energy peaks)
+  energyHistory.push(audioState.rms);
+  if (energyHistory.length > 30) energyHistory.shift();
+  
+  const now = Date.now();
+  if (audioState.rms > 0.15 && now - lastSyllableTime > 120) {
+    const prev = energyHistory[energyHistory.length - 3] || 0;
+    if (audioState.rms > prev * 1.15) {
+      syllableCount++;
+      lastSyllableTime = now;
+    }
+  }
+  
+  if (speechStartTime > 0) {
+    const elapsed = (now - speechStartTime) / 1000;
+    audioState.rate = elapsed > 0.5 ? syllableCount / elapsed : 0;
+  }
+  
+  if (audioState.rms > 0.08 && speechStartTime === 0) {
+    speechStartTime = now; syllableCount = 0;
+  }
+  if (audioState.rms < 0.03) {
+    speechStartTime = 0; syllableCount = 0;
+  }
+}
+
+// ══════════════════════════════════════════
+// AUDIO → EMOTION MAPPING
+// ══════════════════════════════════════════
+function audioEmotionScores() {
+  const s = {};
+  EMOTIONS.forEach(e => s[e] = 0);
+  const { rms, pitch, zcr, centroid, rate, flatness } = audioState;
+
+  // High pitch + high energy = excited/happy
+  if (pitch > 280) { s.excited += 0.3; s.happy += 0.2; s.scared += 0.1; }
+  if (pitch > 350) { s.excited += 0.2; s.scared += 0.15; }
+  // Low pitch + low energy = sad/bored
+  if (pitch > 0 && pitch < 200) { s.sad += 0.2; s.bored += 0.15; s.calm += 0.1; }
+  
+  // Volume
+  if (rms > 0.6) { s.excited += 0.3; s.angry += 0.2; s.happy += 0.15; s.silly += 0.1; }
+  if (rms > 0.4 && rms < 0.6) { s.happy += 0.15; s.curious += 0.1; }
+  if (rms < 0.1 && rms > 0.02) { s.sad += 0.2; s.scared += 0.2; s.calm += 0.15; s.bored += 0.1; }
+  
+  // Speech rate
+  if (rate > 5) { s.excited += 0.25; s.scared += 0.15; s.silly += 0.1; }
+  if (rate > 3 && rate < 5) { s.happy += 0.15; s.curious += 0.1; }
+  if (rate > 0 && rate < 2) { s.sad += 0.15; s.calm += 0.2; s.bored += 0.15; }
+  
+  // Spectral brightness
+  if (centroid > 2500) { s.excited += 0.15; s.angry += 0.1; s.scared += 0.1; }
+  if (centroid < 1200 && centroid > 0) { s.calm += 0.15; s.sad += 0.1; s.bored += 0.1; }
+  
+  // Noisy (high flatness) vs tonal
+  if (flatness > 0.5) { s.angry += 0.1; s.silly += 0.15; }
+  if (flatness < 0.2) { s.calm += 0.1; s.sad += 0.1; }
+
+  // Zero crossings (high = fricatives/whisper)
+  if (zcr > 0.15) { s.scared += 0.1; s.curious += 0.05; }
+
+  return s;
+}
+
+// ══════════════════════════════════════════
+// AUDIO → INTENT MAPPING
+// ══════════════════════════════════════════
+function audioIntentScores() {
+  const s = {};
+  INTENTS.forEach(i => s[i] = 0);
+  const { rms, pitch, rate, zcr } = audioState;
+
+  // Whispering: low volume, present pitch
+  if (rms > 0.02 && rms < 0.12 && pitch > 0) s.whispering = 0.6;
+  // Shouting: high volume
+  if (rms > 0.65) s.shouting = 0.6;
+  // Laughing: rapid energy oscillation + high pitch
+  if (rate > 4 && pitch > 250 && rms > 0.2) s.laughing = 0.5;
+  // Distressed: high pitch + high volume + rapid
+  if (pitch > 320 && rms > 0.5 && rate > 3) s.distressed = 0.4;
+
+  return s;
+}
+
+// ══════════════════════════════════════════
+// TEXT EMOTION ANALYSIS
+// ══════════════════════════════════════════
+let currentTranscript = '';
+let transcriptWords = [];
+
+function analyzeText(text) {
+  const scores = {};
+  EMOTIONS.forEach(e => scores[e] = 0);
+  
+  const words = text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 1);
+  transcriptWords = words.map(w => {
+    let match = null;
+    for (const [emo, lex] of Object.entries(LEXICON)) {
+      if (lex.includes(w)) { match = emo; break; }
+    }
+    return { word: w, match };
+  });
+
+  // Score each word
+  for (const [emo, lex] of Object.entries(LEXICON)) {
+    let hits = 0;
+    for (const w of words) {
+      if (lex.includes(w)) hits++;
+    }
+    if (words.length > 0) scores[emo] = hits / Math.max(3, words.length);
+  }
+
+  // Question detection (boosts curious)
+  if (/\b(what|why|how|where|who|when|can|will|is|are|do)\b/i.test(text)) scores.curious += 0.3;
+  if (text.includes('?')) scores.curious += 0.2;
+
+  // Negation detection
+  if (/\b(no|not|don'?t|won'?t|can'?t|never|stop)\b/i.test(text)) {
+    scores.angry += 0.1; scores.scared += 0.1;
+  }
+
+  // Exclamation boosts energy emotions
+  if (text.includes('!')) {
+    scores.excited += 0.15; scores.happy += 0.1; scores.angry += 0.05;
+  }
+
+  // Repetition detection (emphasis)
+  for (const w of words) {
+    if ((w.match(/(.)\1{2,}/))) { // repeated chars like "nooo" "yesss"
+      scores.excited += 0.15; scores.silly += 0.1;
+    }
+  }
+
+  return scores;
+}
+
+function textIntentScores(text) {
+  const s = {};
+  INTENTS.forEach(i => s[i] = 0);
+  const lower = text.toLowerCase();
+  
+  if (/\b(play|game|let'?s|wanna|want to play)\b/.test(lower)) s.wants_game = 0.6;
+  if (/\b(what|why|how|where|who|tell me|explain)\b/.test(lower)) s.asking_question = 0.5;
+  if (/\b(hug|hold|scared|help|mama|papa|home|miss)\b/.test(lower)) s.seeking_comfort = 0.5;
+  if (/\b(hurt|pain|ow|ouch|stop|no|please)\b/.test(lower)) s.distressed = 0.5;
+  if (/\b(haha|lol|funny|laugh)\b/.test(lower)) s.laughing = 0.4;
+  
+  // Default: just talking if nothing else matches
+  const maxScore = Math.max(...Object.values(s));
+  if (maxScore < 0.2) s.just_talking = 0.4;
+
+  return s;
+}
+
+// ══════════════════════════════════════════
+// FUSION LAYER
+// ══════════════════════════════════════════
+const AUDIO_WEIGHT = 0.45;
+const TEXT_WEIGHT = 0.55;
+
+let fusionResult = {
+  emotion: 'calm',
+  valence: 0,     // -1 (negative) to +1 (positive)
+  arousal: 0,     // 0 (calm) to 1 (activated)
+  confidence: 0,
+  intent: 'just_talking',
+  scores: {},
+  intentScores: {},
+};
+
+const VALENCE_MAP = { happy:0.8, excited:0.6, silly:0.7, calm:0.3, curious:0.2, bored:-0.2, sad:-0.7, scared:-0.6, angry:-0.5 };
+const AROUSAL_MAP = { excited:0.9, angry:0.8, scared:0.7, happy:0.6, silly:0.7, curious:0.4, bored:0.1, calm:0.15, sad:0.2 };
+
+function fuse(audioEmo, textEmo, audioInt, textInt) {
+  // Weighted sum of emotion scores
+  const fused = {};
+  EMOTIONS.forEach(e => {
+    fused[e] = (audioEmo[e] || 0) * AUDIO_WEIGHT + (textEmo[e] || 0) * TEXT_WEIGHT;
+  });
+
+  // Normalize
+  const total = Object.values(fused).reduce((a, b) => a + b, 0) || 1;
+  EMOTIONS.forEach(e => fused[e] /= total);
+
+  // Top emotion
+  let topEmo = 'calm', topScore = 0;
+  for (const [e, s] of Object.entries(fused)) {
+    if (s > topScore) { topEmo = e; topScore = s; }
+  }
+
+  // Fuse intents
+  const fusedInt = {};
+  INTENTS.forEach(i => {
+    fusedInt[i] = (audioInt[i] || 0) * 0.4 + (textInt[i] || 0) * 0.6;
+  });
+  let topIntent = 'just_talking', topIntScore = 0;
+  for (const [i, s] of Object.entries(fusedInt)) {
+    if (s > topIntScore) { topIntent = i; topIntScore = s; }
+  }
+
+  // Compute valence and arousal from weighted emotion scores
+  let valence = 0, arousal = 0;
+  for (const [e, s] of Object.entries(fused)) {
+    valence += (VALENCE_MAP[e] || 0) * s;
+    arousal += (AROUSAL_MAP[e] || 0) * s;
+  }
+
+  fusionResult = {
+    emotion: topEmo,
+    valence: Math.max(-1, Math.min(1, valence)),
+    arousal: Math.max(0, Math.min(1, arousal)),
+    confidence: topScore,
+    intent: topIntent,
+    scores: fused,
+    intentScores: fusedInt,
+  };
+}
+
+// ══════════════════════════════════════════
+// COMPANION STATE MACHINE
+// ══════════════════════════════════════════
+const companionState = {
+  mood: 'calm',
+  energy: 0.3,
+  mode: 'presence',      // presence | game | story | oracle
+  attention: 0.5,        // how engaged the child seems
+  comfortNeed: 0,        // 0-1, how much comfort is needed
+  silenceDuration: 0,    // seconds of silence
+  interactionCount: 0,
+  lastMoodChange: 0,
+  moodHistory: [],
+};
+
+// Face expression mapping
+const MOOD_TO_FACE = {
+  happy:    { eyeH:30, mCurve:14, cheek:0.3, lid:0.18, pupR:11 },
+  sad:      { eyeH:34, mCurve:-4, cheek:0,   lid:0.3,  pupR:9 },
+  scared:   { eyeH:48, mCurve:-2, cheek:0,   lid:0,    pupR:7 },
+  excited:  { eyeH:42, mCurve:10, cheek:0.2, lid:0,    pupR:12 },
+  bored:    { eyeH:18, mCurve:0,  cheek:0,   lid:0.5,  pupR:8 },
+  angry:    { eyeH:32, mCurve:-3, cheek:0,   lid:0.1,  pupR:9 },
+  calm:     { eyeH:28, mCurve:6,  cheek:0.1, lid:0.25, pupR:10 },
+  curious:  { eyeH:46, mCurve:0,  cheek:0,   lid:0,    pupR:13 },
+  silly:    { eyeH:34, mCurve:12, cheek:0.35,lid:0.1,  pupR:11 },
+};
+
+function updateCompanionState(dt) {
+  const now = Date.now();
+  const f = fusionResult;
+
+  // Smooth mood transition (don't flicker)
+  if (f.confidence > 0.15 && now - companionState.lastMoodChange > 800) {
+    if (f.emotion !== companionState.mood) {
+      companionState.mood = f.emotion;
+      companionState.lastMoodChange = now;
+      companionState.moodHistory.push({ mood: f.emotion, t: now });
+      if (companionState.moodHistory.length > 20) companionState.moodHistory.shift();
+    }
+  }
+
+  // Energy from arousal (smoothed)
+  companionState.energy += (f.arousal - companionState.energy) * 0.08;
+
+  // Attention from audio activity
+  const activity = audioState.rms > 0.05 ? 1 : 0;
+  companionState.attention += (activity - companionState.attention) * 0.05;
+
+  // Silence tracking
+  if (audioState.rms < 0.03) companionState.silenceDuration += dt;
+  else companionState.silenceDuration = 0;
+
+  // Comfort need rises with negative valence
+  if (f.valence < -0.2) companionState.comfortNeed = Math.min(1, companionState.comfortNeed + dt * 0.15);
+  else companionState.comfortNeed = Math.max(0, companionState.comfortNeed - dt * 0.05);
+
+  // Mode switching logic
+  if (f.intent === 'wants_game' && companionState.energy > 0.3) {
+    companionState.mode = 'game';
+  } else if (f.intent === 'asking_question') {
+    companionState.mode = 'oracle';
+  } else if (companionState.silenceDuration > 30 && companionState.energy < 0.25) {
+    companionState.mode = 'story';
+  } else if (f.intent === 'seeking_comfort' || f.intent === 'distressed') {
+    companionState.mode = 'presence';
+  }
+
+  companionState.interactionCount++;
+}
+
+// ══════════════════════════════════════════
+// SPEECH RECOGNITION
+// ══════════════════════════════════════════
+function initSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const recog = new SR();
+  recog.continuous = true;
+  recog.interimResults = true;
+  recog.lang = 'en-US';
+
+  recog.onresult = e => {
+    let full = '';
+    for (let i = 0; i < e.results.length; i++) {
+      full += e.results[i][0].transcript;
+    }
+    currentTranscript = full;
+  };
+  recog.onend = () => { try { recog.start(); } catch(e) {} };
+  recog.onerror = e => {
+    if (e.error !== 'not-allowed') setTimeout(() => { try { recog.start(); } catch(ex) {} }, 500);
+  };
+  try { recog.start(); } catch(e) {}
+}
+
+// ══════════════════════════════════════════
+// FACE RENDERER (minimal, focused on emotion display)
+// ══════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, fcx, fcy, fsc;
+
+function resizeFace() {
+  const area = document.getElementById('face-area');
+  const dpr = window.devicePixelRatio || 1;
+  W = area.clientWidth; H = area.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fcx = W / 2; fcy = H / 2;
+  fsc = Math.min(W, H) / 280;
+}
+resizeFace();
+window.addEventListener('resize', resizeFace);
+
+let faceState = { eyeH:28, mCurve:6, cheek:0.1, lid:0.25, pupR:10 };
+let blinkAmt = 0, blinkPhase = 0, blinkTimer = 3, breathPhase = 0;
+let facePupX = 0, facePupY = 0;
+
+function lerpF(a, b, t) { return a + (b - a) * t; }
+
+function updateFace(dt) {
+  const target = MOOD_TO_FACE[companionState.mood] || MOOD_TO_FACE.calm;
+  for (const k of Object.keys(target)) {
+    faceState[k] = lerpF(faceState[k], target[k], 3 * dt);
+  }
+  // Sound-reactive pupil dilation
+  faceState.pupR = lerpF(faceState.pupR, (target.pupR || 10) + audioState.rms * 5, 5 * dt);
+
+  // Pupil from audio direction (placeholder — just gentle wander)
+  facePupX = lerpF(facePupX, Math.sin(Date.now() * 0.0008) * 0.3, 2 * dt);
+  facePupY = lerpF(facePupY, Math.cos(Date.now() * 0.0006) * 0.2 + fusionResult.valence * -0.2, 2 * dt);
+
+  // Blink
+  blinkTimer -= dt;
+  if (blinkTimer <= 0 && blinkPhase === 0) blinkPhase = 1;
+  if (blinkPhase === 1) { blinkAmt = Math.min(1, blinkAmt + dt * 16); if (blinkAmt >= 1) blinkPhase = 2; }
+  else if (blinkPhase === 2) { blinkAmt = Math.max(0, blinkAmt - dt * 12); if (blinkAmt <= 0) { blinkPhase = 0; blinkAmt = 0; blinkTimer = 2.5 + Math.random() * 4; } }
+  if (audioState.rms > 0.6 && blinkPhase === 0) { blinkPhase = 1; }
+
+  breathPhase += dt * 1.2;
+}
+
+function drawFace() {
+  ctx.clearRect(0, 0, W, H);
+
+  // BG gradient by valence
+  const v = fusionResult.valence;
+  const bgHue = v > 0 ? 35 + v * 20 : 240 + v * 30;
+  const grad = ctx.createRadialGradient(fcx, fcy, 0, fcx, fcy, Math.max(W, H) * 0.6);
+  grad.addColorStop(0, `hsla(${bgHue}, 15%, 8%, 1)`);
+  grad.addColorStop(1, `hsla(${bgHue}, 10%, 4%, 1)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Sound ring
+  if (audioState.rms > 0.02) {
+    const rr = 70 * fsc + audioState.rms * 50 * fsc;
+    ctx.strokeStyle = `rgba(200, 200, 220, ${audioState.rms * 0.1})`;
+    ctx.lineWidth = 1 + audioState.rms * 2;
+    ctx.beginPath(); ctx.arc(fcx, fcy, rr, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  const bo = Math.sin(breathPhase) * 2 * fsc;
+  ctx.save();
+  ctx.translate(fcx, fcy + bo);
+
+  const fc = [215, 208, 200];
+  const ew = 22 * fsc;
+  const eh = faceState.eyeH * fsc / 2;
+  const spc = 30 * fsc;
+  const effH = eh * (1 - blinkAmt * 0.92);
+
+  // Eyes
+  [-1, 1].forEach(side => {
+    const ex = side * spc;
+    const ey = -6 * fsc;
+
+    ctx.fillStyle = `rgba(${fc[0]+20}, ${fc[1]+18}, ${fc[2]+14}, 0.9)`;
+    ctx.beginPath(); ctx.ellipse(ex, ey, ew, Math.max(0.5, effH), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(${fc[0]-40}, ${fc[1]-40}, ${fc[2]-40}, 0.25)`;
+    ctx.lineWidth = 1.2 * fsc; ctx.stroke();
+
+    if (blinkAmt < 0.82) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(ex, ey, ew - 1, Math.max(0.5, effH - 1), 0, 0, Math.PI * 2); ctx.clip();
+      const pr = faceState.pupR * fsc / 2;
+      const px = ex + facePupX * (ew - pr) * 0.5;
+      const py = ey + facePupY * (effH - pr) * 0.4;
+      ctx.fillStyle = `rgba(20, 18, 28, 0.88)`;
+      ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,0.7)`;
+      ctx.beginPath(); ctx.arc(px - pr * 0.3, py - pr * 0.35, pr * 0.28, 0, Math.PI * 2); ctx.fill();
+      if (faceState.lid > 0.02) {
+        ctx.fillStyle = `rgba(${fc[0]-5}, ${fc[1]-5}, ${fc[2]-8}, 0.95)`;
+        ctx.beginPath(); ctx.ellipse(ex, ey - effH + faceState.lid * eh * 0.4, ew + 2, faceState.lid * eh, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (blinkAmt > 0.65) {
+      ctx.strokeStyle = `rgba(${fc[0]-30}, ${fc[1]-30}, ${fc[2]-30}, ${blinkAmt})`;
+      ctx.lineWidth = 2 * fsc; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ex - ew * 0.6, ey); ctx.quadraticCurveTo(ex, ey + 2 * fsc, ex + ew * 0.6, ey); ctx.stroke();
+    }
+  });
+
+  // Mouth
+  const my = 28 * fsc;
+  const mhw = 14 * fsc;
+  const soundOpen = audioState.rms * 8 * fsc;
+  ctx.strokeStyle = `rgba(${fc[0]-20}, ${fc[1]-20}, ${fc[2]-20}, 0.45)`;
+  ctx.lineWidth = 2 * fsc; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-mhw, my);
+  ctx.quadraticCurveTo(0, my + faceState.mCurve * fsc + soundOpen, mhw, my);
+  ctx.stroke();
+
+  // Cheeks
+  if (faceState.cheek > 0.01) {
+    [-1, 1].forEach(side => {
+      const chx = side * (spc + 10 * fsc);
+      const cg = ctx.createRadialGradient(chx, 14 * fsc, 0, chx, 14 * fsc, 12 * fsc);
+      cg.addColorStop(0, `rgba(240,158,146,${faceState.cheek})`);
+      cg.addColorStop(1, `rgba(240,158,146,0)`);
+      ctx.fillStyle = cg;
+      ctx.fillRect(chx - 12 * fsc, 14 * fsc - 12 * fsc, 24 * fsc, 24 * fsc);
+    });
+  }
+
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════
+// UI UPDATE
+// ══════════════════════════════════════════
+function updateUI() {
+  // Audio features
+  AUDIO_FEATURES.forEach(f => {
+    const val = audioState[f.key];
+    const norm = Math.min(1, val / f.max);
+    document.getElementById(`bar-${f.key}`).style.width = (norm * 100) + '%';
+    const display = f.max >= 100 ? (val | 0) : val.toFixed(3);
+    document.getElementById(`fv-${f.key}`).textContent = display;
+  });
+
+  // Transcript with highlighted emotion words
+  const tbox = document.getElementById('transcript-box');
+  if (transcriptWords.length > 0) {
+    tbox.innerHTML = transcriptWords.map(w =>
+      `<span class="word${w.match ? ' emo-match' : ''}" title="${w.match || ''}">${w.word} </span>`
+    ).join('');
+  } else if (currentTranscript) {
+    tbox.textContent = currentTranscript;
+  }
+
+  // Emotion scores in bar
+  const f = fusionResult;
+  EMOTIONS.forEach(e => {
+    const cell = document.getElementById(`emo-${e}`);
+    const val = document.getElementById(`emo-v-${e}`);
+    const score = f.scores[e] || 0;
+    val.textContent = (score * 100 | 0);
+    cell.className = `emo-cell${e === f.emotion ? ' active' : ''}`;
+  });
+
+  // Text emotion scores
+  const textScoresEl = document.getElementById('text-emo-scores');
+  const textScores = analyzeText(currentTranscript);
+  const sorted = Object.entries(textScores).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  textScoresEl.innerHTML = sorted.map(([e, s]) =>
+    `<span style="margin-right:12px;color:rgba(255,255,255,${0.35 + s * 0.55})">${e} ${(s * 100 | 0)}</span>`
+  ).join('');
+
+  // Fusion output
+  document.getElementById('fusion-output').textContent =
+    `emotion: ${f.emotion} (${(f.confidence * 100 | 0)}%)\n` +
+    `valence: ${f.valence > 0 ? '+' : ''}${f.valence.toFixed(2)}  arousal: ${f.arousal.toFixed(2)}\n` +
+    `intent:  ${f.intent}`;
+
+  // Intent tags
+  INTENTS.forEach(i => {
+    const el = document.getElementById(`int-${i}`);
+    el.className = `intent-tag${i === f.intent ? ' active' : ''}`;
+  });
+
+  // State machine
+  const cs = companionState;
+  document.getElementById('state-output').innerHTML = [
+    ['mood', cs.mood],
+    ['mode', cs.mode],
+    ['energy', cs.energy.toFixed(2)],
+    ['attention', cs.attention.toFixed(2)],
+    ['comfort need', cs.comfortNeed.toFixed(2)],
+    ['silence', cs.silenceDuration.toFixed(1) + 's'],
+  ].map(([k, v]) => `<div class="state-item"><span class="state-key">${k}</span><span class="state-val">${v}</span></div>`).join('');
+}
+
+// ══════════════════════════════════════════
+// MAIN LOOP
+// ══════════════════════════════════════════
+let lastT = 0, running = false, uiCounter = 0;
+
+function frame(now) {
+  if (!running) return;
+  const dt = Math.min(0.1, (now - lastT) / 1000);
+  lastT = now;
+
+  extractAudioFeatures();
+
+  // Run classifiers
+  const audioEmo = audioEmotionScores();
+  const textEmo = analyzeText(currentTranscript);
+  const audioInt = audioIntentScores();
+  const textInt = textIntentScores(currentTranscript);
+  fuse(audioEmo, textEmo, audioInt, textInt);
+
+  updateCompanionState(dt);
+  updateFace(dt);
+  drawFace();
+
+  // Update UI at lower rate
+  uiCounter++;
+  if (uiCounter % 4 === 0) updateUI();
+
+  requestAnimationFrame(frame);
+}
+
+document.getElementById('start').addEventListener('click', async () => {
+  document.getElementById('start').style.display = 'none';
+  document.getElementById('app').classList.add('show');
+  resizeFace();
+  await initAudio();
+  initSpeech();
+  running = true;
+  lastT = performance.now();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

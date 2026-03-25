@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Sound Composer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout { max-width: 700px; margin: 0 auto; padding: 12px; }
+
+  h1 { font-size: 16px; padding: 8px 0; }
+  h2 {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 12px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+
+  /* Master */
+  #master { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+  #master label { font-size: 11px; color: #888; }
+  #master input { width: 120px; }
+
+  /* Existing sounds */
+  .sound-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 4px; padding: 6px 0;
+  }
+  .sbtn {
+    padding: 6px 4px; font: inherit; font-size: 10px;
+    border: 1px solid #ddd; border-radius: 5px;
+    background: #fff; cursor: pointer; text-align: center;
+  }
+  .sbtn:hover { background: #eee; }
+  .sbtn:active { background: #3b82f6; color: #fff; }
+
+  /* Composer */
+  .composer-block {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 12px; margin: 8px 0;
+  }
+  .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+  .row label { font-size: 11px; color: #888; min-width: 60px; text-align: right; }
+  .row select, .row input[type="number"] {
+    font: inherit; font-size: 11px; padding: 2px 4px;
+    border: 1px solid #ddd; border-radius: 4px; width: 80px;
+  }
+  .row input[type="range"] { flex: 1; max-width: 150px; }
+  .row .val { font-size: 11px; font-weight: 600; min-width: 40px; }
+
+  .btn {
+    padding: 6px 16px; font: inherit; font-size: 12px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  .btn:hover { background: #eee; }
+  .btn-primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .btn-primary:hover { background: #2563eb; }
+
+  .actions { display: flex; gap: 6px; padding: 8px 0; flex-wrap: wrap; }
+
+  /* Layers */
+  .layer {
+    background: #f8f8f8; border: 1px solid #eee; border-radius: 6px;
+    padding: 8px; margin: 6px 0;
+  }
+  .layer-header { display: flex; justify-content: space-between; align-items: center; }
+  .layer-title { font-size: 11px; font-weight: 600; }
+  .layer-remove { font-size: 10px; color: #888; cursor: pointer; border: none; background: none; }
+
+  #output {
+    font-size: 11px; background: #1a1a1a; color: #a0e0a0; padding: 10px;
+    border-radius: 6px; white-space: pre-wrap; margin: 8px 0; max-height: 200px;
+    overflow-y: auto; display: none;
+  }
+</style>
+</head>
+<body>
+<div id="layout">
+  <h1>Sound Composer</h1>
+
+  <div id="master">
+    <label>master vol</label>
+    <input type="range" id="master-vol" min="0" max="1" step="0.05" value="0.7">
+    <span class="val" id="master-val">0.7</span>
+  </div>
+
+  <h2>Existing sounds — tap to preview</h2>
+  <div id="existing" class="sound-grid"></div>
+
+  <h2>Compose a new sound</h2>
+  <div id="layers"></div>
+
+  <div class="actions">
+    <button class="btn" id="add-tone">+ tone</button>
+    <button class="btn" id="add-noise">+ noise</button>
+    <button class="btn btn-primary" id="play-composed">play</button>
+    <button class="btn" id="copy-code">copy code</button>
+  </div>
+
+  <pre id="output"></pre>
+</div>
+
+<script type="module">
+import { init as initVoice, resume, sounds, list, setVolume, VOICE } from './js/services/voice.js';
+import { init as synthInit, tone, noise, getCtx } from './js/utils/synth.js';
+
+// Init audio on first click
+let ready = false;
+document.addEventListener('click', () => {
+  if (!ready) { initVoice(); ready = true; }
+  resume();
+}, { once: false });
+
+// Master volume
+const masterSlider = document.getElementById('master-vol');
+const masterVal = document.getElementById('master-val');
+masterSlider.addEventListener('input', () => {
+  const v = parseFloat(masterSlider.value);
+  masterVal.textContent = v.toFixed(2);
+  setVolume(v);
+});
+
+// Existing sounds
+const existingEl = document.getElementById('existing');
+list().forEach(name => {
+  const btn = document.createElement('button');
+  btn.className = 'sbtn';
+  btn.textContent = name.replace(/_/g, ' ');
+  btn.addEventListener('click', () => { resume(); sounds[name](0.5); });
+  existingEl.appendChild(btn);
+});
+
+// ══════════════════════════════════════════
+// COMPOSER
+// ══════════════════════════════════════════
+
+let layerData = [];
+const layersEl = document.getElementById('layers');
+
+function addLayer(type) {
+  const id = Date.now();
+  const layer = type === 'tone' ? {
+    id, type: 'tone',
+    waveform: 'sine',
+    freqStart: 400,
+    freqEnd: 400,
+    duration: 0.3,
+    delay: 0,
+    attack: 0.01,
+    release: 0.3,
+    volume: 1,
+    vibratoRate: 0,
+    vibratoDepth: 0,
+    filterType: 'none',
+    filterFreq: 1000,
+    filterQ: 1,
+  } : {
+    id, type: 'noise',
+    shape: 'decay',
+    decayRate: 0.2,
+    duration: 0.2,
+    delay: 0,
+    volume: 1,
+    modFreq: 0,
+    filterType: 'lowpass',
+    filterFreq: 1000,
+    filterQ: 1,
+  };
+
+  layerData.push(layer);
+  renderLayers();
+}
+
+function removeLayer(id) {
+  layerData = layerData.filter(l => l.id !== id);
+  renderLayers();
+}
+
+function renderLayers() {
+  layersEl.innerHTML = '';
+  layerData.forEach((layer, idx) => {
+    const el = document.createElement('div');
+    el.className = 'layer';
+
+    if (layer.type === 'tone') {
+      el.innerHTML = `
+        <div class="layer-header">
+          <span class="layer-title">Tone ${idx + 1}</span>
+          <button class="layer-remove" data-id="${layer.id}">remove</button>
+        </div>
+        <div class="row"><label>waveform</label><select data-key="waveform">
+          ${['sine','triangle','sawtooth','square'].map(w => `<option ${layer.waveform===w?'selected':''}>${w}</option>`).join('')}
+        </select></div>
+        <div class="row"><label>freq start</label><input type="range" data-key="freqStart" min="30" max="2000" step="5" value="${layer.freqStart}"><span class="val">${layer.freqStart}</span></div>
+        <div class="row"><label>freq end</label><input type="range" data-key="freqEnd" min="30" max="2000" step="5" value="${layer.freqEnd}"><span class="val">${layer.freqEnd}</span></div>
+        <div class="row"><label>duration</label><input type="range" data-key="duration" min="0.02" max="2" step="0.02" value="${layer.duration}"><span class="val">${layer.duration}</span></div>
+        <div class="row"><label>delay</label><input type="range" data-key="delay" min="0" max="2" step="0.02" value="${layer.delay}"><span class="val">${layer.delay}</span></div>
+        <div class="row"><label>attack</label><input type="range" data-key="attack" min="0.001" max="0.5" step="0.005" value="${layer.attack}"><span class="val">${layer.attack}</span></div>
+        <div class="row"><label>release</label><input type="range" data-key="release" min="0.05" max="1" step="0.05" value="${layer.release}"><span class="val">${layer.release}</span></div>
+        <div class="row"><label>volume</label><input type="range" data-key="volume" min="0" max="1" step="0.05" value="${layer.volume}"><span class="val">${layer.volume}</span></div>
+        <div class="row"><label>vibrato rate</label><input type="range" data-key="vibratoRate" min="0" max="30" step="1" value="${layer.vibratoRate}"><span class="val">${layer.vibratoRate}</span></div>
+        <div class="row"><label>vibrato depth</label><input type="range" data-key="vibratoDepth" min="0" max="100" step="1" value="${layer.vibratoDepth}"><span class="val">${layer.vibratoDepth}</span></div>
+        <div class="row"><label>filter</label><select data-key="filterType">
+          ${['none','lowpass','highpass','bandpass'].map(f => `<option ${layer.filterType===f?'selected':''}>${f}</option>`).join('')}
+        </select></div>
+        <div class="row"><label>filter freq</label><input type="range" data-key="filterFreq" min="50" max="5000" step="10" value="${layer.filterFreq}"><span class="val">${layer.filterFreq}</span></div>
+        <div class="row"><label>filter Q</label><input type="range" data-key="filterQ" min="0.1" max="20" step="0.1" value="${layer.filterQ}"><span class="val">${layer.filterQ}</span></div>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="layer-header">
+          <span class="layer-title">Noise ${idx + 1}</span>
+          <button class="layer-remove" data-id="${layer.id}">remove</button>
+        </div>
+        <div class="row"><label>shape</label><select data-key="shape">
+          ${['decay','sine','attack'].map(s => `<option ${layer.shape===s?'selected':''}>${s}</option>`).join('')}
+        </select></div>
+        <div class="row"><label>decay rate</label><input type="range" data-key="decayRate" min="0.01" max="1" step="0.01" value="${layer.decayRate}"><span class="val">${layer.decayRate}</span></div>
+        <div class="row"><label>duration</label><input type="range" data-key="duration" min="0.02" max="2" step="0.02" value="${layer.duration}"><span class="val">${layer.duration}</span></div>
+        <div class="row"><label>delay</label><input type="range" data-key="delay" min="0" max="2" step="0.02" value="${layer.delay}"><span class="val">${layer.delay}</span></div>
+        <div class="row"><label>volume</label><input type="range" data-key="volume" min="0" max="1" step="0.05" value="${layer.volume}"><span class="val">${layer.volume}</span></div>
+        <div class="row"><label>mod freq</label><input type="range" data-key="modFreq" min="0" max="200" step="1" value="${layer.modFreq}"><span class="val">${layer.modFreq}</span></div>
+        <div class="row"><label>filter</label><select data-key="filterType">
+          ${['none','lowpass','highpass','bandpass'].map(f => `<option ${layer.filterType===f?'selected':''}>${f}</option>`).join('')}
+        </select></div>
+        <div class="row"><label>filter freq</label><input type="range" data-key="filterFreq" min="50" max="5000" step="10" value="${layer.filterFreq}"><span class="val">${layer.filterFreq}</span></div>
+        <div class="row"><label>filter Q</label><input type="range" data-key="filterQ" min="0.1" max="20" step="0.1" value="${layer.filterQ}"><span class="val">${layer.filterQ}</span></div>
+      `;
+    }
+
+    // Wire up inputs
+    el.querySelectorAll('input[type="range"], select').forEach(input => {
+      const key = input.dataset.key;
+      input.addEventListener('input', () => {
+        const v = input.tagName === 'SELECT' ? input.value : parseFloat(input.value);
+        layer[key] = v;
+        const valEl = input.parentElement.querySelector('.val');
+        if (valEl) valEl.textContent = typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : v;
+      });
+    });
+
+    // Remove button
+    el.querySelector('.layer-remove').addEventListener('click', () => removeLayer(layer.id));
+
+    layersEl.appendChild(el);
+  });
+}
+
+// Play composed sound
+function playComposed() {
+  if (!ready) return;
+  resume();
+
+  layerData.forEach(layer => {
+    if (layer.type === 'tone') {
+      const opts = {
+        type: layer.waveform,
+        freq: layer.freqStart === layer.freqEnd ? layer.freqStart : [layer.freqStart, layer.freqEnd],
+        duration: layer.duration,
+        delay: layer.delay,
+        attack: layer.attack,
+        release: layer.release,
+        volume: layer.volume,
+      };
+      if (layer.vibratoRate > 0) opts.vibrato = { rate: layer.vibratoRate, depth: layer.vibratoDepth };
+      if (layer.filterType !== 'none') opts.filter = { type: layer.filterType, freq: layer.filterFreq, Q: layer.filterQ };
+      tone(opts);
+    } else {
+      const opts = {
+        duration: layer.duration,
+        delay: layer.delay,
+        shape: layer.shape,
+        decayRate: layer.decayRate,
+        volume: layer.volume,
+      };
+      if (layer.modFreq > 0) opts.modFreq = layer.modFreq;
+      if (layer.filterType !== 'none') opts.filter = { type: layer.filterType, freq: layer.filterFreq, Q: layer.filterQ };
+      noise(opts);
+    }
+  });
+}
+
+// Generate code
+function generateCode() {
+  const output = document.getElementById('output');
+  let code = 'my_sound(dur = 0.5) {\n';
+
+  layerData.forEach(layer => {
+    if (layer.type === 'tone') {
+      const freq = layer.freqStart === layer.freqEnd ? layer.freqStart : `[${layer.freqStart}, ${layer.freqEnd}]`;
+      code += `  tone({ type: '${layer.waveform}', freq: ${freq}, duration: ${layer.duration}`;
+      if (layer.delay > 0) code += `, delay: ${layer.delay}`;
+      if (layer.attack !== 0.01) code += `, attack: ${layer.attack}`;
+      if (layer.release !== 0.3) code += `, release: ${layer.release}`;
+      if (layer.volume !== 1) code += `, volume: ${layer.volume}`;
+      if (layer.vibratoRate > 0) code += `, vibrato: { rate: ${layer.vibratoRate}, depth: ${layer.vibratoDepth} }`;
+      if (layer.filterType !== 'none') code += `, filter: { type: '${layer.filterType}', freq: ${layer.filterFreq}, Q: ${layer.filterQ} }`;
+      code += ' });\n';
+    } else {
+      code += `  noise({ duration: ${layer.duration}, shape: '${layer.shape}'`;
+      if (layer.delay > 0) code += `, delay: ${layer.delay}`;
+      if (layer.decayRate !== 0.2) code += `, decayRate: ${layer.decayRate}`;
+      if (layer.volume !== 1) code += `, volume: ${layer.volume}`;
+      if (layer.modFreq > 0) code += `, modFreq: ${layer.modFreq}`;
+      if (layer.filterType !== 'none') code += `, filter: { type: '${layer.filterType}', freq: ${layer.filterFreq}, Q: ${layer.filterQ} }`;
+      code += ' });\n';
+    }
+  });
+
+  code += '}';
+  output.textContent = code;
+  output.style.display = 'block';
+  navigator.clipboard.writeText(code);
+}
+
+// Buttons
+document.getElementById('add-tone').addEventListener('click', () => addLayer('tone'));
+document.getElementById('add-noise').addEventListener('click', () => addLayer('noise'));
+document.getElementById('play-composed').addEventListener('click', playComposed);
+document.getElementById('copy-code').addEventListener('click', generateCode);
+
+// Start with one tone layer
+addLayer('tone');
+</script>
+</body>
+</html>

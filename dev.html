@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Dev Console</title>
+<style>
+:root {
+  --bg: #111;
+  --surface: #1a1a1a;
+  --text: #d0d0d0;
+  --muted: #666;
+  --accent: #5b9bf6;
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --red: #f87171;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.6 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  padding: 16px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+h1 .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  transition: background 0.3s;
+}
+
+h1 .dot.connected { background: var(--green); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+section {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+section h2 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.label { color: var(--muted); }
+.value { color: var(--text); text-align: right; }
+.value.ready { color: var(--green); }
+.value.loading { color: var(--yellow); }
+
+#transcript {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 60px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--muted);
+  font-style: italic;
+}
+
+#log {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  padding: 2px 0;
+  border-bottom: 1px solid #222;
+  font-size: 12px;
+}
+
+.log-entry .time { color: var(--muted); margin-right: 8px; }
+.log-entry.intent { color: var(--accent); }
+.log-entry.face { color: var(--green); }
+.log-entry.reaction { color: var(--yellow); }
+
+.waiting {
+  color: var(--muted);
+  text-align: center;
+  padding: 40px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+
+<h1>
+  <span class="dot" id="status-dot"></span>
+  Blocky Dev Console
+</h1>
+
+<div class="grid">
+
+  <!-- Companion State -->
+  <section>
+    <h2>Companion</h2>
+    <div id="companion-state"><div class="waiting">waiting for connection...</div></div>
+  </section>
+
+  <!-- Models -->
+  <section>
+    <h2>Models</h2>
+    <div id="models-state"><div class="waiting">—</div></div>
+  </section>
+
+  <!-- Sensors -->
+  <section>
+    <h2>Sensors</h2>
+    <div id="sensor-state"><div class="waiting">—</div></div>
+  </section>
+
+  <!-- Known Faces -->
+  <section>
+    <h2>Known Faces</h2>
+    <div id="faces-state"><div class="waiting">—</div></div>
+  </section>
+
+</div>
+
+<br>
+
+<!-- Transcript -->
+<section>
+  <h2>Transcript</h2>
+  <div id="transcript">waiting for speech...</div>
+</section>
+
+<br>
+
+<!-- Event Log -->
+<section>
+  <h2>Event Log</h2>
+  <div id="log"></div>
+</section>
+
+<script>
+const channel = new BroadcastChannel('blocky-dev');
+const dot = document.getElementById('status-dot');
+let lastPing = 0;
+
+channel.onmessage = (e) => {
+  const { type, data } = e.data;
+  lastPing = Date.now();
+  dot.classList.add('connected');
+
+  switch (type) {
+    case 'state': renderState(data); break;
+    case 'log': appendLog(data); break;
+    case 'transcript': renderTranscript(data); break;
+  }
+};
+
+// Connection watchdog
+setInterval(() => {
+  if (Date.now() - lastPing > 3000) {
+    dot.classList.remove('connected');
+  }
+}, 1000);
+
+function renderState(s) {
+  // Companion
+  document.getElementById('companion-state').innerHTML = rows([
+    ['mood', s.mood],
+    ['mode', s.mode],
+    ['energy', s.energy],
+    ['attention', s.attention],
+    ['silence', s.silence],
+    ['intent', s.lastIntent || '—'],
+    ['face', s.currentFace || '—'],
+  ]);
+
+  // Models
+  document.getElementById('models-state').innerHTML = rows([
+    ['nlu', s.nluReady ? 'ready' : 'loading...', s.nluReady],
+    ['face detect', s.faceModelsReady ? 'ready' : 'not loaded', s.faceModelsReady],
+    ['scanning', s.scanning ? 'active' : 'idle'],
+    ['camera', s.cameraActive ? 'active' : 'off'],
+  ]);
+
+  // Sensors
+  document.getElementById('sensor-state').innerHTML = rows([
+    ['tilt X', s.tiltX],
+    ['tilt Y', s.tiltY],
+    ['shake', s.shake],
+    ['rotating', s.rotating],
+    ['face down', s.faceDown],
+  ]);
+
+  // Faces
+  const facesEl = document.getElementById('faces-state');
+  if (s.knownFaces && s.knownFaces.length > 0) {
+    facesEl.innerHTML = s.knownFaces.map(f =>
+      `<div class="row"><span class="label">${f.name}</span><span class="value">${f.role} (${f.seeCount}x)</span></div>`
+    ).join('');
+  } else {
+    facesEl.innerHTML = '<div class="row"><span class="label">none enrolled</span></div>';
+  }
+}
+
+function rows(data) {
+  return data.map(([k, v, isReady]) => {
+    const cls = isReady === true ? ' ready' : isReady === false ? ' loading' : '';
+    return `<div class="row"><span class="label">${k}</span><span class="value${cls}">${v}</span></div>`;
+  }).join('');
+}
+
+function renderTranscript(text) {
+  document.getElementById('transcript').textContent = text || 'waiting for speech...';
+}
+
+function appendLog(entry) {
+  const el = document.createElement('div');
+  el.className = `log-entry ${entry.type || ''}`;
+  el.innerHTML = `<span class="time">${entry.time}</span>${entry.msg}`;
+  const log = document.getElementById('log');
+  log.prepend(el);
+  while (log.children.length > 50) log.lastChild.remove();
+}
+</script>
+</body>
+</html>

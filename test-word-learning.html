@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Word Learning</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+  h1 { font-size: 16px; padding: 8px 0; }
+  h2 {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 12px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+
+  /* Push to talk */
+  #ptt {
+    display: block; width: 100%; padding: 20px;
+    font: inherit; font-size: 16px; font-weight: 700;
+    border: 2px solid #ddd; border-radius: 12px;
+    background: #fff; cursor: pointer; text-align: center;
+    user-select: none; touch-action: none;
+    transition: all 0.15s;
+  }
+  #ptt:hover { border-color: #3b82f6; background: #f8faff; }
+  #ptt.recording {
+    border-color: #ef4444; background: #fef2f2; color: #ef4444;
+    animation: pulse 0.6s ease-in-out infinite;
+  }
+  #ptt.processing {
+    border-color: #f59e0b; background: #fffbeb; color: #f59e0b;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+  .btn {
+    padding: 8px 20px; font: inherit; font-size: 13px;
+    border: 1px solid #ddd; border-radius: 8px;
+    background: #fff; cursor: pointer;
+  }
+  .btn:hover { background: #eee; }
+
+  #status {
+    text-align: center; font-size: 13px; color: #888; padding: 8px 0;
+    min-height: 28px; transition: color 0.3s;
+  }
+  #status.alert { color: #3b82f6; font-weight: 700; }
+  #status.error { color: #ef4444; }
+
+  /* Last heard */
+  #last-heard {
+    text-align: center; font-size: 20px; font-weight: 700;
+    padding: 12px; min-height: 48px; color: #3b82f6;
+  }
+
+  /* Settings */
+  .setting { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .setting label { font-size: 11px; color: #888; min-width: 100px; text-align: right; }
+  .setting input[type="range"] { flex: 1; max-width: 120px; }
+  .setting .val { font-size: 11px; font-weight: 600; min-width: 36px; }
+  .setting .hint { font-size: 10px; color: #aaa; }
+
+  /* Word list */
+  .word-entry {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; margin: 4px 0;
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+  }
+  .word-entry.learned { border-color: #3b82f6; background: #eff6ff; }
+  .word-text { font-size: 16px; font-weight: 700; min-width: 80px; }
+  .word-count { font-size: 11px; color: #888; min-width: 30px; }
+  .word-bar { flex: 1; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+  .word-bar-fill { height: 100%; background: #94a3b8; border-radius: 3px; transition: width 0.3s; }
+  .word-entry.learned .word-bar-fill { background: #3b82f6; }
+  .word-play, .word-del {
+    padding: 4px 12px; font: inherit; font-size: 10px;
+    border: 1px solid #ddd; border-radius: 4px;
+    background: #fff; cursor: pointer;
+  }
+  .word-play:hover { background: #eee; }
+  .word-del { color: #ccc; border-color: #eee; }
+  .word-del:hover { color: #ef4444; background: #fef2f2; border-color: #fca5a5; }
+
+  .actions { display: flex; gap: 8px; justify-content: center; padding: 8px 0; flex-wrap: wrap; }
+
+  /* Sentence builder */
+  #sentence-input {
+    font: inherit; font-size: 15px; padding: 8px 12px;
+    border: 2px solid #ddd; border-radius: 8px;
+    width: 100%; text-align: center;
+  }
+  #sentence-input:focus { border-color: #3b82f6; outline: none; }
+
+  #sentence-preview {
+    display: flex; gap: 3px; justify-content: center; flex-wrap: wrap;
+    padding: 8px 0; min-height: 32px;
+  }
+  .sp-token {
+    padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  }
+  .sp-known { background: #dbeafe; color: #1e40af; }
+  .sp-babble { background: #f1f5f9; color: #94a3b8; font-style: italic; }
+
+  .mood-grid {
+    display: flex; gap: 4px; justify-content: center; padding: 6px 0; flex-wrap: wrap;
+  }
+  .mood-btn {
+    padding: 5px 14px; font: inherit; font-size: 11px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  .mood-btn:hover { background: #eee; }
+  .mood-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+  /* Language */
+  #lang-row {
+    display: flex; align-items: center; gap: 8px; justify-content: center;
+    padding: 8px 0; flex-wrap: wrap;
+  }
+  #lang-row label { font-size: 11px; color: #888; }
+  #lang-select {
+    font: inherit; font-size: 12px; padding: 4px 8px;
+    border: 1px solid #ddd; border-radius: 6px; background: #fff;
+  }
+  #lang-status {
+    font-size: 11px; color: #888; font-style: italic;
+  }
+  #lang-status.detected { color: #16a34a; font-weight: 600; font-style: normal; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <h1>Word Learning</h1>
+  <p style="font-size:12px;color:#888;padding-bottom:12px;">
+    Hold the button and say a single word. Repeat it enough times and Blocky learns it.
+  </p>
+
+  <button id="ptt">hold to speak</button>
+  <div id="last-heard"></div>
+  <div id="lang-row">
+    <label>language</label>
+    <select id="lang-select">
+      <option value="auto">auto-detect</option>
+      <option value="fr-FR">French</option>
+      <option value="en-US">English</option>
+      <option value="es-ES">Spanish</option>
+      <option value="de-DE">German</option>
+      <option value="it-IT">Italian</option>
+      <option value="pt-BR">Portuguese</option>
+      <option value="nl-NL">Dutch</option>
+      <option value="ru-RU">Russian</option>
+      <option value="ja-JP">Japanese</option>
+      <option value="zh-CN">Chinese</option>
+      <option value="ko-KR">Korean</option>
+      <option value="ar-SA">Arabic</option>
+      <option value="hi-IN">Hindi</option>
+      <option value="pl-PL">Polish</option>
+      <option value="sv-SE">Swedish</option>
+    </select>
+    <span id="lang-status"></span>
+  </div>
+  <div id="status">ready</div>
+
+  <h2>Blocky's voice</h2>
+  <div class="setting"><label>learn after</label><input type="range" id="s-threshold" min="2" max="10" step="1" value="3"><span class="val" id="sv-threshold">3</span><span class="hint">repeats</span></div>
+  <div class="setting"><label>pitch</label><input type="range" id="s-pitch" min="-4" max="20" step="1" value="10"><span class="val" id="sv-pitch">10</span><span class="hint">semitones</span></div>
+  <div class="setting"><label>speed</label><input type="range" id="s-speed" min="0.4" max="1.5" step="0.05" value="0.7"><span class="val" id="sv-speed">0.7</span></div>
+  <div class="setting"><label>formant</label><input type="range" id="s-formant" min="300" max="2000" step="10" value="800"><span class="val" id="sv-formant">800</span></div>
+  <div class="setting"><label>formant Q</label><input type="range" id="s-formantQ" min="0.5" max="10" step="0.5" value="3"><span class="val" id="sv-formantQ">3</span></div>
+  <div class="setting"><label>vibrato rate</label><input type="range" id="s-vibRate" min="0" max="20" step="1" value="8"><span class="val" id="sv-vibRate">8</span></div>
+  <div class="setting"><label>vibrato depth</label><input type="range" id="s-vibDepth" min="0" max="100" step="1" value="40"><span class="val" id="sv-vibDepth">40</span></div>
+  <div class="setting"><label>reverb</label><input type="range" id="s-reverb" min="0" max="0.5" step="0.05" value="0.15"><span class="val" id="sv-reverb">0.15</span></div>
+
+  <h2>Blocky speaks</h2>
+  <p style="font-size:11px;color:#999;padding:2px 0 6px;">
+    Type a sentence. Known words play as learned audio — the rest is babble.
+  </p>
+  <input type="text" id="sentence-input" placeholder="viens jouer avec moi...">
+  <div id="sentence-preview"></div>
+  <div class="mood-grid">
+    <button class="mood-btn active" data-mood="neutral">neutral</button>
+    <button class="mood-btn" data-mood="excited">excited</button>
+    <button class="mood-btn" data-mood="happy">happy</button>
+    <button class="mood-btn" data-mood="sad">sad</button>
+    <button class="mood-btn" data-mood="question">question?</button>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-speak-sentence">speak</button>
+  </div>
+
+  <h2>Vocabulary</h2>
+  <div id="word-list"></div>
+  <div class="actions">
+    <button class="btn" id="btn-reset">clear all</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+
+let audioCtx = null;
+let micStream = null;
+
+const wordCounts = {};
+const wordBuffers = {};
+
+// ── Language detection ──
+const LANG_KEY = 'blocky_lang';
+const LANG_CANDIDATES = [
+  'fr-FR','en-US','es-ES','de-DE','it-IT','pt-BR',
+  'nl-NL','ru-RU','ja-JP','zh-CN','ko-KR','ar-SA','hi-IN','pl-PL','sv-SE',
+];
+let chosenLang = localStorage.getItem(LANG_KEY) || 'auto';
+let langScores = {};      // { 'fr-FR': 2, 'en-US': 0 } — successful recognitions per language
+let autoTryIdx = 0;       // which candidate to try next in auto mode
+const AUTO_LOCK_AFTER = 2; // lock language after N successful recognitions
+
+function getLangForRecognition() {
+  if (chosenLang !== 'auto') return chosenLang;
+  // In auto mode: cycle through candidates, starting with the most common
+  return LANG_CANDIDATES[autoTryIdx % LANG_CANDIDATES.length];
+}
+
+function onRecognitionSuccess(langUsed) {
+  if (chosenLang !== 'auto') return;
+  langScores[langUsed] = (langScores[langUsed] || 0) + 1;
+  if (langScores[langUsed] >= AUTO_LOCK_AFTER) {
+    // Auto-lock this language
+    chosenLang = langUsed;
+    localStorage.setItem(LANG_KEY, langUsed);
+    document.getElementById('lang-select').value = langUsed;
+    const langStatusEl = document.getElementById('lang-status');
+    langStatusEl.textContent = 'detected!';
+    langStatusEl.className = 'detected';
+    setTimeout(() => { langStatusEl.textContent = ''; langStatusEl.className = ''; }, 3000);
+  }
+}
+
+function onRecognitionFail(langUsed) {
+  if (chosenLang !== 'auto') return;
+  // Move to next candidate
+  autoTryIdx++;
+  const nextLang = LANG_CANDIDATES[autoTryIdx % LANG_CANDIDATES.length];
+  const langStatusEl = document.getElementById('lang-status');
+  langStatusEl.textContent = `trying ${nextLang}...`;
+}
+
+const S = {
+  threshold: 3,
+  pitch: 10, speed: 0.7,
+  formant: 800, formantQ: 3,
+  vibRate: 8, vibDepth: 40,
+  reverb: 0.15,
+};
+
+// ══════════════════════════════════════════
+// PERSISTENCE — IndexedDB for audio, localStorage for counts
+// ══════════════════════════════════════════
+
+const DB_NAME = 'blocky_words';
+const DB_VERSION = 1;
+const STORE_NAME = 'audio';
+const COUNTS_KEY = 'blocky_wordCounts';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(STORE_NAME))
+        req.result.createObjectStore(STORE_NAME, { keyPath: 'word' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveAudioToDB(word, audioBuffer) {
+  const db = await openDB();
+  const channels = [];
+  for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++)
+    channels.push(Array.from(audioBuffer.getChannelData(ch)));
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put({
+      word,
+      sampleRate: audioBuffer.sampleRate,
+      numChannels: audioBuffer.numberOfChannels,
+      length: audioBuffer.length,
+      channels,
+    });
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadAudioFromDB(word) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(word);
+    req.onsuccess = () => {
+      const d = req.result;
+      if (!d) { resolve(null); return; }
+      const ctx = getAudioCtx();
+      const buf = ctx.createBuffer(d.numChannels, d.length, d.sampleRate);
+      for (let ch = 0; ch < d.numChannels; ch++)
+        buf.getChannelData(ch).set(new Float32Array(d.channels[ch]));
+      resolve(buf);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteAudioFromDB(word) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(word);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function clearAllAudioDB() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function saveCounts() {
+  localStorage.setItem(COUNTS_KEY, JSON.stringify(wordCounts));
+}
+
+function loadCounts() {
+  try { Object.assign(wordCounts, JSON.parse(localStorage.getItem(COUNTS_KEY) || '{}')); }
+  catch (e) {}
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// ══════════════════════════════════════════
+// DOM
+// ══════════════════════════════════════════
+
+const pttBtn = document.getElementById('ptt');
+const lastHeardEl = document.getElementById('last-heard');
+const statusEl = document.getElementById('status');
+const wordListEl = document.getElementById('word-list');
+
+function setStatus(msg, cls = '') {
+  statusEl.textContent = msg;
+  statusEl.className = cls;
+}
+
+// Language selector
+const langSelect = document.getElementById('lang-select');
+langSelect.value = chosenLang;
+langSelect.addEventListener('change', () => {
+  chosenLang = langSelect.value;
+  if (chosenLang === 'auto') {
+    localStorage.removeItem(LANG_KEY);
+    langScores = {};
+    autoTryIdx = 0;
+    document.getElementById('lang-status').textContent = '';
+  } else {
+    localStorage.setItem(LANG_KEY, chosenLang);
+    document.getElementById('lang-status').textContent = '';
+  }
+});
+
+// Settings wiring
+['threshold','pitch','speed','formant','formantQ','vibRate','vibDepth','reverb'].forEach(key => {
+  const input = document.getElementById('s-' + key);
+  const val = document.getElementById('sv-' + key);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    val.textContent = input.value;
+    S[key] = parseFloat(input.value);
+  });
+});
+
+// ══════════════════════════════════════════
+// PUSH TO TALK — record audio + recognize word simultaneously
+// ══════════════════════════════════════════
+
+let isRecording = false;
+let recorder = null;
+let recordChunks = [];
+let recognition = null;
+let recognizedWord = null;
+let recognizedLang = null;
+
+async function ensureMic() {
+  if (micStream && micStream.active) return;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+}
+
+function startPTT() {
+  if (isRecording) return;
+  isRecording = true;
+  recognizedWord = null;
+  recognizedLang = null;
+  recordChunks = [];
+
+  pttBtn.classList.add('recording');
+  pttBtn.textContent = 'listening...';
+  lastHeardEl.textContent = '';
+  setStatus('speak now', 'alert');
+
+  ensureMic().then(() => {
+    // Start audio recording
+    recorder = new MediaRecorder(micStream);
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordChunks.push(e.data);
+    };
+    recorder.start();
+
+    // Start speech recognition (single shot)
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 3;
+
+      const tryLang = getLangForRecognition();
+      recognition.lang = tryLang;
+
+      // Show which language we're trying in auto mode
+      if (chosenLang === 'auto') {
+        document.getElementById('lang-status').textContent = `trying ${tryLang}...`;
+      }
+
+      recognition.onresult = (e) => {
+        // Pick the best single-word result — accept any unicode letter, not just a-z
+        for (let i = 0; i < e.results.length; i++) {
+          for (let a = 0; a < e.results[i].length; a++) {
+            const raw = e.results[i][a].transcript.trim();
+            // Strip punctuation/spaces, keep letters (any script)
+            const text = raw.replace(/[\s\d.,!?;:'"()\-]/g, '').toLowerCase();
+            if (text.length >= 2) {
+              recognizedWord = text;
+              recognizedLang = tryLang;
+              return;
+            }
+          }
+        }
+      };
+
+      recognition.onerror = () => {};
+      recognition.start();
+    }
+  }).catch((err) => {
+    setStatus('mic error: ' + err.message, 'error');
+    stopPTT();
+  });
+}
+
+async function stopPTT() {
+  if (!isRecording) return;
+  isRecording = false;
+
+  pttBtn.classList.remove('recording');
+  pttBtn.classList.add('processing');
+  pttBtn.textContent = 'processing...';
+
+  // Stop recognition
+  if (recognition) {
+    try { recognition.stop(); } catch (e) {}
+  }
+
+  // Stop recording and process
+  if (recorder && recorder.state === 'recording') {
+    recorder.stop();
+    // Wait for the last ondataavailable + onstop
+    await new Promise(resolve => { recorder.onstop = resolve; });
+  }
+
+  // Small delay to let recognition finish
+  await new Promise(r => setTimeout(r, 300));
+
+  pttBtn.classList.remove('processing');
+  pttBtn.textContent = 'hold to speak';
+
+  // Decode audio
+  if (recordChunks.length === 0) {
+    setStatus('no audio captured', 'error');
+    return;
+  }
+
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  let audioBuffer;
+  try {
+    const blob = new Blob(recordChunks, { type: recorder.mimeType });
+    const ab = await blob.arrayBuffer();
+    audioBuffer = await ctx.decodeAudioData(ab);
+  } catch (e) {
+    setStatus('failed to decode audio', 'error');
+    return;
+  }
+
+  // Trim silence from the recording
+  audioBuffer = trimSilence(audioBuffer);
+
+  if (!recognizedWord) {
+    // In auto mode, the lang we tried is stored in the recognition object
+    const triedLang = recognition ? recognition.lang : getLangForRecognition();
+    onRecognitionFail(triedLang);
+    setStatus('didn\'t catch that — try again', 'error');
+    lastHeardEl.textContent = '?';
+    return;
+  }
+
+  // Language auto-detection: mark success for whichever language worked
+  if (recognizedLang) onRecognitionSuccess(recognizedLang);
+
+  // We have both: a recognized word and its tight audio
+  const word = recognizedWord;
+  lastHeardEl.textContent = word;
+
+  const prev = wordCounts[word] || 0;
+  wordCounts[word] = prev + 1;
+
+  // Always store latest audio (better recording replaces older)
+  wordBuffers[word] = audioBuffer;
+  saveCounts();
+  saveAudioToDB(word, audioBuffer).catch(() => {});
+
+  const count = wordCounts[word];
+  const threshold = S.threshold;
+
+  if (count >= threshold) {
+    if (prev < threshold) {
+      // Just learned!
+      setStatus(`Blocky learned "${word}"!`, 'alert');
+      setTimeout(() => playAsBlocky(word), 500);
+    } else {
+      setStatus(`"${word}" — ${count}x (learned)`, '');
+      // Re-record updates the audio — play the new version
+      setTimeout(() => playAsBlocky(word), 300);
+    }
+  } else {
+    setStatus(`"${word}" — ${count}/${threshold}`, '');
+  }
+
+  renderWordList();
+  updateSentencePreview();
+}
+
+// ── Trim silence from start/end of AudioBuffer ──
+function trimSilence(buffer) {
+  const data = buffer.getChannelData(0);
+  const sr = buffer.sampleRate;
+
+  // Find RMS energy in small windows
+  const winSize = Math.floor(sr * 0.02); // 20ms windows
+  let maxRMS = 0;
+  for (let i = 0; i + winSize < data.length; i += winSize) {
+    let sum = 0;
+    for (let j = 0; j < winSize; j++) sum += data[i + j] * data[i + j];
+    maxRMS = Math.max(maxRMS, Math.sqrt(sum / winSize));
+  }
+
+  const threshold = maxRMS * 0.08;
+  let start = 0, end = data.length;
+
+  // Find start
+  for (let i = 0; i + winSize < data.length; i += winSize) {
+    let sum = 0;
+    for (let j = 0; j < winSize; j++) sum += data[i + j] * data[i + j];
+    if (Math.sqrt(sum / winSize) > threshold) { start = Math.max(0, i - winSize * 2); break; }
+  }
+
+  // Find end
+  for (let i = data.length - winSize; i >= 0; i -= winSize) {
+    let sum = 0;
+    for (let j = 0; j < winSize; j++) sum += data[i + j] * data[i + j];
+    if (Math.sqrt(sum / winSize) > threshold) { end = Math.min(data.length, i + winSize * 3); break; }
+  }
+
+  if (end <= start || end - start < sr * 0.05) return buffer; // too short, keep original
+
+  const ctx = getAudioCtx();
+  const trimmed = ctx.createBuffer(buffer.numberOfChannels, end - start, sr);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    trimmed.getChannelData(ch).set(buffer.getChannelData(ch).slice(start, end));
+  }
+  return trimmed;
+}
+
+// ── PTT button events ──
+pttBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); startPTT(); });
+pttBtn.addEventListener('pointerup', () => stopPTT());
+pttBtn.addEventListener('pointerleave', () => { if (isRecording) stopPTT(); });
+pttBtn.addEventListener('pointercancel', () => { if (isRecording) stopPTT(); });
+
+// ══════════════════════════════════════════
+// PLAY AS BLOCKY — pitch shift + formant filter chain
+// ══════════════════════════════════════════
+
+async function playAsBlocky(word) {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  let buffer = wordBuffers[word];
+  if (!buffer) {
+    try {
+      buffer = await loadAudioFromDB(word);
+      if (buffer) wordBuffers[word] = buffer;
+    } catch (e) {}
+  }
+  if (!buffer) { setStatus(`no audio for "${word}"`, 'error'); return; }
+
+  // Pitch shift via playback rate
+  const totalRate = Math.pow(2, S.pitch / 12) * S.speed;
+  const newLen = Math.max(1, Math.floor(buffer.length / totalRate));
+  const offline = new OfflineAudioContext(buffer.numberOfChannels, newLen, buffer.sampleRate);
+  const offSrc = offline.createBufferSource();
+  offSrc.buffer = buffer;
+  offSrc.playbackRate.value = totalRate;
+  offSrc.connect(offline.destination);
+  offSrc.start();
+  const shifted = await offline.startRendering();
+
+  // Build filter chain
+  const src = audioCtx.createBufferSource();
+  src.buffer = shifted;
+  let chain = src;
+
+  // Highpass — remove rumble
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 200;
+  chain.connect(hp); chain = hp;
+
+  // Dual formant — Blocky's vocal resonance
+  const f1 = audioCtx.createBiquadFilter();
+  f1.type = 'bandpass'; f1.frequency.value = S.formant; f1.Q.value = S.formantQ;
+  const f2 = audioCtx.createBiquadFilter();
+  f2.type = 'bandpass'; f2.frequency.value = S.formant * 2; f2.Q.value = S.formantQ * 0.7;
+  const fMix = audioCtx.createGain(); fMix.gain.value = 1;
+  const f2g = audioCtx.createGain(); f2g.gain.value = 0.4;
+  chain.connect(f1).connect(fMix);
+  chain.connect(f2).connect(f2g).connect(fMix);
+  chain = fMix;
+
+  // Lowpass
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 4000;
+  chain.connect(lp); chain = lp;
+
+  // Vibrato via modulated delay
+  if (S.vibRate > 0) {
+    const dly = audioCtx.createDelay(0.1);
+    dly.delayTime.value = 0.005;
+    const lfo = audioCtx.createOscillator();
+    const lg = audioCtx.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = S.vibRate;
+    lg.gain.value = S.vibDepth * 0.00001;
+    lfo.connect(lg).connect(dly.delayTime);
+    lfo.start();
+    chain.connect(dly); chain = dly;
+    src.onended = () => lfo.stop();
+  }
+
+  // Gain boost
+  const gain = audioCtx.createGain();
+  gain.gain.value = 3;
+  chain.connect(gain); chain = gain;
+
+  // Reverb
+  if (S.reverb > 0) {
+    const dry = audioCtx.createGain(); dry.gain.value = 1;
+    const wet = audioCtx.createGain(); wet.gain.value = S.reverb;
+    const len = Math.floor(audioCtx.sampleRate * 0.4);
+    const imp = audioCtx.createBuffer(2, len, audioCtx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = imp.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len * 0.3));
+    }
+    const conv = audioCtx.createConvolver(); conv.buffer = imp;
+    chain.connect(dry).connect(audioCtx.destination);
+    chain.connect(conv).connect(wet).connect(audioCtx.destination);
+  } else {
+    chain.connect(audioCtx.destination);
+  }
+
+  src.start();
+}
+
+// ══════════════════════════════════════════
+// SENTENCE BUILDER — babble with learned words
+// ══════════════════════════════════════════
+
+// Mood profiles: control babble character
+const MOODS = {
+  neutral:  { baseFreq: 320, freqRange: 0.3, syllDur: [0.08, 0.14], gap: [0.02, 0.05], pitchDrift: 0, volume: 0.5 },
+  excited:  { baseFreq: 420, freqRange: 0.5, syllDur: [0.05, 0.10], gap: [0.01, 0.03], pitchDrift: 0.15, volume: 0.7 },
+  happy:    { baseFreq: 380, freqRange: 0.35, syllDur: [0.07, 0.12], gap: [0.02, 0.04], pitchDrift: 0.1, volume: 0.6 },
+  sad:      { baseFreq: 200, freqRange: 0.15, syllDur: [0.12, 0.20], gap: [0.04, 0.08], pitchDrift: -0.1, volume: 0.35 },
+  question: { baseFreq: 340, freqRange: 0.3, syllDur: [0.07, 0.13], gap: [0.02, 0.04], pitchDrift: 0.3, volume: 0.5 },
+};
+
+let currentMood = 'neutral';
+
+// Generate a single babble syllable as an AudioBuffer
+async function renderBabbleSyllable(mood, position, total) {
+  const m = MOODS[mood] || MOODS.neutral;
+  const sr = 44100;
+  const dur = m.syllDur[0] + Math.random() * (m.syllDur[1] - m.syllDur[0]);
+  const len = Math.max(64, Math.floor(sr * dur));
+  const offline = new OfflineAudioContext(1, len, sr);
+
+  // Pitch contour: drift up for questions at end, down for statements
+  const progress = total > 1 ? position / (total - 1) : 0.5;
+  const driftMult = 1 + m.pitchDrift * progress;
+  const freq = m.baseFreq * driftMult * (1 + (Math.random() * 2 - 1) * m.freqRange);
+  const freqEnd = freq * (0.85 + Math.random() * 0.3);
+
+  // Oscillator
+  const osc = offline.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(freq, 0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), dur * 0.8);
+
+  // Vibrato
+  const lfo = offline.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 5 + Math.random() * 8;
+  const lfoGain = offline.createGain();
+  lfoGain.gain.value = 5 + Math.random() * 15;
+  lfo.connect(lfoGain).connect(osc.frequency);
+
+  // Formant filter — vary the "vowel" per syllable
+  const formantFreq = 400 + Math.random() * 800;
+  const filter = offline.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = formantFreq;
+  filter.Q.value = 2 + Math.random() * 4;
+
+  // Second formant for richness
+  const f2 = offline.createBiquadFilter();
+  f2.type = 'bandpass';
+  f2.frequency.value = formantFreq * (1.5 + Math.random() * 0.8);
+  f2.Q.value = 1.5 + Math.random() * 2;
+  const f2Gain = offline.createGain();
+  f2Gain.gain.value = 0.3;
+
+  // Amplitude envelope
+  const gain = offline.createGain();
+  gain.gain.setValueAtTime(0.001, 0);
+  gain.gain.linearRampToValueAtTime(m.volume, Math.min(dur * 0.15, 0.015));
+  gain.gain.setValueAtTime(m.volume, dur * 0.6);
+  gain.gain.exponentialRampToValueAtTime(0.001, dur);
+
+  // Mix
+  const mix = offline.createGain();
+  mix.gain.value = 1;
+  osc.connect(filter).connect(mix);
+  osc.connect(f2).connect(f2Gain).connect(mix);
+  mix.connect(gain).connect(offline.destination);
+  lfo.start(0);
+  osc.start(0);
+  lfo.stop(dur);
+  osc.stop(dur);
+
+  return offline.startRendering();
+}
+
+// Render a learned word through Blocky's filter chain as an offline buffer
+async function renderWordAsBlocky(word) {
+  let buffer = wordBuffers[word];
+  if (!buffer) {
+    try { buffer = await loadAudioFromDB(word); if (buffer) wordBuffers[word] = buffer; }
+    catch (e) {}
+  }
+  if (!buffer) return null;
+
+  const sr = buffer.sampleRate;
+  const totalRate = Math.pow(2, S.pitch / 12) * S.speed;
+  const newLen = Math.max(1, Math.floor(buffer.length / totalRate));
+  const offline = new OfflineAudioContext(1, newLen, sr);
+
+  const src = offline.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = totalRate;
+  let chain = src;
+
+  // Highpass
+  const hp = offline.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 200;
+  chain.connect(hp); chain = hp;
+
+  // Dual formant
+  const f1 = offline.createBiquadFilter();
+  f1.type = 'bandpass'; f1.frequency.value = S.formant; f1.Q.value = S.formantQ;
+  const f2 = offline.createBiquadFilter();
+  f2.type = 'bandpass'; f2.frequency.value = S.formant * 2; f2.Q.value = S.formantQ * 0.7;
+  const fMix = offline.createGain(); fMix.gain.value = 1;
+  const f2g = offline.createGain(); f2g.gain.value = 0.4;
+  chain.connect(f1).connect(fMix);
+  chain.connect(f2).connect(f2g).connect(fMix);
+  chain = fMix;
+
+  // Lowpass
+  const lp = offline.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 4000;
+  chain.connect(lp); chain = lp;
+
+  // Gain boost
+  const g = offline.createGain();
+  g.gain.value = 3;
+  chain.connect(g).connect(offline.destination);
+
+  src.start(0);
+  return offline.startRendering();
+}
+
+// Parse sentence → tokens (known words vs babble)
+function tokenizeSentence(text) {
+  const knownWords = new Set(
+    Object.entries(wordCounts)
+      .filter(([_, c]) => c >= S.threshold)
+      .map(([w]) => w)
+  );
+
+  const rawWords = text.trim().split(/\s+/).filter(Boolean);
+  return rawWords.map(raw => {
+    const clean = raw.toLowerCase().replace(/[\s\d.,!?;:'"()\-]/g, '');
+    if (knownWords.has(clean)) {
+      return { type: 'word', word: clean, display: raw };
+    } else {
+      return { type: 'babble', display: raw };
+    }
+  });
+}
+
+// Update the preview display
+function updateSentencePreview() {
+  const text = document.getElementById('sentence-input').value;
+  const preview = document.getElementById('sentence-preview');
+  if (!text.trim()) { preview.innerHTML = ''; return; }
+
+  const tokens = tokenizeSentence(text);
+  preview.innerHTML = tokens.map(t =>
+    t.type === 'word'
+      ? `<span class="sp-token sp-known">${t.display}</span>`
+      : `<span class="sp-token sp-babble">${t.display}</span>`
+  ).join('');
+}
+
+// Play the whole sentence
+async function speakSentence() {
+  const text = document.getElementById('sentence-input').value;
+  if (!text.trim()) return;
+
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  const tokens = tokenizeSentence(text);
+  const mood = currentMood;
+  const m = MOODS[mood] || MOODS.neutral;
+
+  setStatus('rendering sentence...', 'alert');
+
+  // Pre-render all audio segments
+  const segments = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type === 'word') {
+      const buf = await renderWordAsBlocky(t.word);
+      if (buf) {
+        segments.push({ buffer: buf, type: 'word' });
+      } else {
+        // Fallback to babble if audio missing
+        segments.push({ buffer: await renderBabbleSyllable(mood, i, tokens.length), type: 'babble' });
+      }
+    } else {
+      // For babble tokens, generate 1-2 syllables per "word"
+      const numSyll = 1 + Math.floor(Math.random() * 2);
+      for (let s = 0; s < numSyll; s++) {
+        segments.push({ buffer: await renderBabbleSyllable(mood, i, tokens.length), type: 'babble' });
+      }
+    }
+  }
+
+  // Schedule playback with proper timing
+  let time = ctx.currentTime + 0.05;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const src = ctx.createBufferSource();
+    src.buffer = seg.buffer;
+
+    // Add reverb to everything for cohesion
+    if (S.reverb > 0 && i === 0) {
+      // Build a shared reverb bus (only once)
+      const dry = ctx.createGain(); dry.gain.value = 1;
+      const wet = ctx.createGain(); wet.gain.value = S.reverb;
+      const rvbLen = Math.floor(ctx.sampleRate * 0.4);
+      const imp = ctx.createBuffer(2, rvbLen, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = imp.getChannelData(ch);
+        for (let j = 0; j < rvbLen; j++) d[j] = (Math.random() * 2 - 1) * Math.exp(-j / (rvbLen * 0.3));
+      }
+      const conv = ctx.createConvolver(); conv.buffer = imp;
+      // Store on window for other segments to reuse
+      window._rvbDry = dry; window._rvbWet = wet; window._rvbConv = conv;
+      dry.connect(ctx.destination);
+      conv.connect(wet).connect(ctx.destination);
+    }
+
+    if (S.reverb > 0 && window._rvbDry) {
+      src.connect(window._rvbDry);
+      src.connect(window._rvbConv);
+    } else {
+      src.connect(ctx.destination);
+    }
+
+    src.start(time);
+
+    const segDur = seg.buffer.duration;
+    // Slightly bigger gap before/after learned words for emphasis
+    const gap = seg.type === 'word'
+      ? 0.04 + Math.random() * 0.03
+      : m.gap[0] + Math.random() * (m.gap[1] - m.gap[0]);
+
+    // Tiny pause before a known word for emphasis
+    if (i + 1 < segments.length && segments[i + 1].type === 'word' && seg.type === 'babble') {
+      time += segDur + gap + 0.03;
+    } else {
+      time += segDur + gap;
+    }
+  }
+
+  const totalDur = time - ctx.currentTime;
+  setStatus(`speaking... (${totalDur.toFixed(1)}s)`, 'alert');
+  setTimeout(() => setStatus(''), totalDur * 1000 + 200);
+}
+
+// Wire up sentence UI
+document.getElementById('sentence-input').addEventListener('input', updateSentencePreview);
+document.getElementById('sentence-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') speakSentence();
+});
+document.getElementById('btn-speak-sentence').addEventListener('click', speakSentence);
+
+// Mood buttons
+document.querySelectorAll('.mood-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMood = btn.dataset.mood;
+  });
+});
+
+// ══════════════════════════════════════════
+// WORD LIST
+// ══════════════════════════════════════════
+
+function renderWordList() {
+  const sorted = Object.entries(wordCounts).sort((a, b) => b[1] - a[1]);
+  const maxCount = sorted.length > 0 ? Math.max(sorted[0][1], S.threshold) : S.threshold;
+
+  wordListEl.innerHTML = sorted.map(([word, count]) => {
+    const learned = count >= S.threshold;
+    const pct = Math.min(100, (count / maxCount) * 100);
+    return `
+      <div class="word-entry ${learned ? 'learned' : ''}">
+        <span class="word-text">${word}</span>
+        <span class="word-count">${count}x</span>
+        <div class="word-bar"><div class="word-bar-fill" style="width:${pct}%"></div></div>
+        ${learned ? `<button class="word-play" data-word="${word}">play</button>` : ''}
+        <button class="word-del" data-word="${word}">x</button>
+      </div>`;
+  }).join('');
+
+  wordListEl.querySelectorAll('.word-play').forEach(btn => {
+    btn.addEventListener('click', () => playAsBlocky(btn.dataset.word));
+  });
+  wordListEl.querySelectorAll('.word-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const w = btn.dataset.word;
+      delete wordCounts[w];
+      delete wordBuffers[w];
+      saveCounts();
+      deleteAudioFromDB(w).catch(() => {});
+      renderWordList();
+    });
+  });
+}
+
+// ── Reset ──
+document.getElementById('btn-reset').addEventListener('click', async () => {
+  if (!confirm('Clear all learned words?')) return;
+  Object.keys(wordCounts).forEach(k => delete wordCounts[k]);
+  Object.keys(wordBuffers).forEach(k => delete wordBuffers[k]);
+  localStorage.removeItem(COUNTS_KEY);
+  await clearAllAudioDB().catch(() => {});
+  lastHeardEl.textContent = '';
+  wordListEl.innerHTML = '';
+  setStatus('cleared');
+});
+
+// ── Init ──
+loadCounts();
+renderWordList();
+const learned = Object.values(wordCounts).filter(c => c >= S.threshold).length;
+const total = Object.keys(wordCounts).length;
+if (total > 0) setStatus(`${total} words loaded (${learned} learned)`);
+</script>
+</body>
+</html>

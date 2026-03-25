@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blocky — Phoneme Workbench</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    min-height: 100%; background: #f4f4f4;
+    font: 13px/1.5 'SF Mono', 'Fira Code', monospace;
+    color: #1a1a1a;
+  }
+  #layout { max-width: 700px; margin: 0 auto; padding: 12px; }
+
+  h1 { font-size: 16px; padding: 8px 0; }
+  h2 {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: #888; padding: 12px 0 4px; border-bottom: 1px solid #e0e0e0;
+  }
+
+  .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; flex-wrap: wrap; }
+  .row label { font-size: 11px; color: #888; min-width: 70px; text-align: right; }
+  .row input[type="range"] { flex: 1; max-width: 150px; }
+  .row .val { font-size: 11px; font-weight: 600; min-width: 40px; }
+
+  #word-input {
+    font: inherit; font-size: 20px; padding: 10px 14px;
+    border: 2px solid #ddd; border-radius: 8px;
+    width: 100%; text-align: center; letter-spacing: 4px;
+  }
+  #word-input:focus { border-color: #3b82f6; outline: none; }
+
+  .btn {
+    padding: 8px 20px; font: inherit; font-size: 13px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  .btn:hover { background: #eee; }
+  .btn-primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .btn-primary:hover { background: #2563eb; }
+
+  .actions { display: flex; gap: 6px; justify-content: center; padding: 10px 0; flex-wrap: wrap; }
+
+  /* Quick words */
+  .word-grid {
+    display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0; justify-content: center;
+  }
+  .word-btn {
+    padding: 6px 12px; font: inherit; font-size: 12px;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer;
+  }
+  .word-btn:hover { background: #eee; }
+  .word-btn:active { background: #3b82f6; color: #fff; }
+
+  /* Phoneme grid */
+  .phoneme-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 4px; padding: 6px 0;
+  }
+  .ph-btn {
+    padding: 8px 4px; font: inherit; font-size: 14px; font-weight: 700;
+    border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; cursor: pointer; text-align: center;
+  }
+  .ph-btn:hover { background: #eee; }
+  .ph-btn:active { background: #3b82f6; color: #fff; }
+  .ph-btn[data-kind="vowel"] { border-color: #93c5fd; }
+  .ph-btn[data-kind="nasal"] { border-color: #a5b4fc; }
+  .ph-btn[data-kind="plosive"] { border-color: #fca5a5; }
+  .ph-btn[data-kind="fricative"] { border-color: #fcd34d; }
+  .ph-btn[data-kind="liquid"] { border-color: #86efac; }
+
+  /* Phoneme detail */
+  .ph-detail {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 12px; margin: 8px 0;
+  }
+  .ph-name { font-size: 18px; font-weight: 700; }
+  .ph-kind { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Visual breakdown */
+  #breakdown {
+    display: flex; gap: 2px; padding: 8px 0; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .brk-letter {
+    padding: 6px 8px; border-radius: 4px; font-size: 16px; font-weight: 700;
+    text-align: center; min-width: 32px;
+  }
+  .brk-vowel { background: #dbeafe; color: #1e40af; }
+  .brk-nasal { background: #e0e7ff; color: #3730a3; }
+  .brk-plosive { background: #fee2e2; color: #991b1b; }
+  .brk-fricative { background: #fef3c7; color: #92400e; }
+  .brk-liquid { background: #d1fae5; color: #065f46; }
+</style>
+</head>
+<body>
+<div id="layout">
+  <h1>Phoneme Workbench</h1>
+
+  <input type="text" id="word-input" placeholder="type a word..." value="blocky">
+  <div id="breakdown"></div>
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-speak">speak</button>
+  </div>
+
+  <h2>Voice settings</h2>
+  <div class="row"><label>base pitch</label><input type="range" id="v-base" min="100" max="800" step="10" value="320"><span class="val" id="vv-base">320</span></div>
+  <div class="row"><label>syllable dur</label><input type="range" id="v-dur" min="0.04" max="0.3" step="0.01" value="0.12"><span class="val" id="vv-dur">0.12</span></div>
+  <div class="row"><label>gap</label><input type="range" id="v-gap" min="0" max="0.1" step="0.005" value="0.02"><span class="val" id="vv-gap">0.02</span></div>
+  <div class="row"><label>timbre</label>
+    <select id="v-timbre">
+      <option value="sawtooth" selected>sawtooth</option>
+      <option value="triangle">triangle</option>
+      <option value="square">square</option>
+      <option value="sine">sine</option>
+    </select>
+  </div>
+
+  <h2>Quick words</h2>
+  <div class="word-grid">
+    <button class="word-btn" data-word="blocky">blocky</button>
+    <button class="word-btn" data-word="hello">hello</button>
+    <button class="word-btn" data-word="mama">mama</button>
+    <button class="word-btn" data-word="papa">papa</button>
+    <button class="word-btn" data-word="sleep">sleep</button>
+    <button class="word-btn" data-word="game">game</button>
+    <button class="word-btn" data-word="love">love</button>
+    <button class="word-btn" data-word="no">no</button>
+    <button class="word-btn" data-word="yay">yay</button>
+    <button class="word-btn" data-word="ooh">ooh</button>
+    <button class="word-btn" data-word="haha">haha</button>
+    <button class="word-btn" data-word="uh oh">uh oh</button>
+    <button class="word-btn" data-word="bye">bye</button>
+    <button class="word-btn" data-word="fun">fun</button>
+    <button class="word-btn" data-word="nom nom">nom nom</button>
+    <button class="word-btn" data-word="boo">boo</button>
+  </div>
+
+  <h2>Individual phonemes — tap to hear</h2>
+  <div id="phoneme-grid" class="phoneme-grid"></div>
+
+  <div id="phoneme-detail" class="ph-detail" style="display:none;"></div>
+</div>
+
+<script type="module">
+import { init as initVoice, resume, VOICE } from './js/services/voice.js';
+import { init as synthInit, tone, noise } from './js/utils/synth.js';
+import { speakWord, syllabify, listPhonemes } from './js/utils/phonemes.js';
+
+// Audio init on first click
+let ready = false;
+document.addEventListener('click', () => {
+  if (!ready) { initVoice(); ready = true; }
+  resume();
+}, { once: false });
+
+// ── Voice settings ──
+
+const voiceSettings = {
+  base: 320,
+  syllableDur: 0.12,
+  gap: 0.02,
+  timbre: 'sawtooth',
+};
+
+function getVoice() {
+  return {
+    base: voiceSettings.base,
+    timbre: voiceSettings.timbre,
+    formant: VOICE.formant,
+    formantQ: VOICE.formantQ,
+    range: VOICE.range,
+  };
+}
+
+// Sliders
+['base', 'dur', 'gap'].forEach(key => {
+  const input = document.getElementById(`v-${key}`);
+  const val = document.getElementById(`vv-${key}`);
+  input.addEventListener('input', () => {
+    const v = parseFloat(input.value);
+    val.textContent = v;
+    if (key === 'base') voiceSettings.base = v;
+    if (key === 'dur') voiceSettings.syllableDur = v;
+    if (key === 'gap') voiceSettings.gap = v;
+  });
+});
+
+document.getElementById('v-timbre').addEventListener('change', (e) => {
+  voiceSettings.timbre = e.target.value;
+});
+
+// ── Speak word ──
+
+const wordInput = document.getElementById('word-input');
+const breakdownEl = document.getElementById('breakdown');
+
+function updateBreakdown() {
+  const word = wordInput.value;
+  const syls = syllabify(word);
+  breakdownEl.innerHTML = syls.map(syl => {
+    if (syl.pause) return '<span class="brk-letter" style="background:transparent;">·</span>';
+    const text = syl.onset + syl.vowel + syl.coda;
+    return `<span class="brk-letter brk-vowel" style="cursor:pointer;" data-syl="${text}">${text}</span>`;
+  }).join('');
+
+  // Click individual syllable to hear it
+  breakdownEl.querySelectorAll('[data-syl]').forEach(el => {
+    el.addEventListener('click', () => {
+      speakWord(el.dataset.syl, getVoice(), {
+        syllableDur: voiceSettings.syllableDur,
+        gap: 0,
+      });
+    });
+  });
+}
+
+function speakCurrent() {
+  if (!ready) return;
+  const word = wordInput.value.trim();
+  if (!word) return;
+  speakWord(word, getVoice(), {
+    syllableDur: voiceSettings.syllableDur,
+    gap: voiceSettings.gap,
+  });
+}
+
+wordInput.addEventListener('input', updateBreakdown);
+document.getElementById('btn-speak').addEventListener('click', speakCurrent);
+wordInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') speakCurrent();
+});
+
+// ── Quick words ──
+
+document.querySelectorAll('.word-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    wordInput.value = btn.dataset.word;
+    updateBreakdown();
+    speakCurrent();
+  });
+});
+
+// ── Phoneme grid ──
+
+const phonemeGrid = document.getElementById('phoneme-grid');
+const detailEl = document.getElementById('phoneme-detail');
+
+listPhonemes().forEach(ch => {
+  const btn = document.createElement('button');
+  btn.className = 'ph-btn';
+  btn.textContent = ch;
+  btn.addEventListener('click', () => {
+    // Speak as a syllable with 'a' if consonant, or bare if vowel
+    const testWord = 'aeiouy'.includes(ch) ? ch : ch + 'a';
+    speakWord(testWord, getVoice(), {
+      syllableDur: voiceSettings.syllableDur * 1.5,
+      gap: 0,
+    });
+  });
+  phonemeGrid.appendChild(btn);
+});
+
+// Init
+updateBreakdown();
+</script>
+</body>
+</html>
