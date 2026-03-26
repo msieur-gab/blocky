@@ -237,8 +237,78 @@ function resize() {
   cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 280;
 }
 
+// ── Blink system ──
+let blinkAmt = 0;       // 0 = open, 1 = closed
+let blinkPhase = 0;     // 0 = waiting, 1 = closing, 2 = opening
+let blinkTimer = 2 + Math.random() * 3;
+let blinksLeft = 0;
+let blinkPause = 0;
+let blinkOffset = 0;    // asymmetric: right eye delay in frames
+
+function updateBlink(dt) {
+  if (blinkPhase === 0) {
+    if (blinkPause > 0) {
+      blinkPause -= dt;
+      if (blinkPause <= 0) blinkPhase = 1;
+    } else {
+      blinkTimer -= dt;
+      if (blinkTimer <= 0) {
+        // Decide blink type
+        const roll = Math.random();
+        if (roll < 0.55) {
+          blinksLeft = 1;                        // single
+          blinkOffset = 0;
+        } else if (roll < 0.80) {
+          blinksLeft = 2;                        // double fast
+          blinkOffset = 0;
+        } else if (roll < 0.92) {
+          blinksLeft = 3;                        // triple nervous
+          blinkOffset = 0;
+        } else {
+          blinksLeft = 1;                        // asymmetric
+          blinkOffset = 0.04 + Math.random() * 0.03;
+        }
+        blinkPhase = 1;
+      }
+    }
+  }
+
+  const isMulti = blinksLeft > 1;
+  const closeSpd = isMulti ? 28 : 14;
+  const openSpd = isMulti ? 22 : 10;
+
+  if (blinkPhase === 1) {
+    blinkAmt = Math.min(1, blinkAmt + dt * closeSpd);
+    if (blinkAmt >= 1) blinkPhase = 2;
+  } else if (blinkPhase === 2) {
+    blinkAmt = Math.max(0, blinkAmt - dt * openSpd);
+    if (blinkAmt <= 0) {
+      blinkAmt = 0;
+      blinkPhase = 0;
+      blinksLeft--;
+      if (blinksLeft > 0) {
+        blinkPause = 0.04 + Math.random() * 0.04;
+      } else {
+        blinkTimer = 2 + Math.random() * 4;
+        blinkOffset = 0;
+      }
+    }
+  }
+}
+
+function getBlinkScale(isRight) {
+  // Asymmetric: right eye slightly delayed
+  if (isRight && blinkOffset > 0) {
+    return Math.max(0.08, 1 - Math.max(0, blinkAmt - blinkOffset / 0.1) * 0.95);
+  }
+  return Math.max(0.08, 1 - blinkAmt * 0.95);
+}
+
 function draw() {
-  t += 0.016;
+  const dt = 0.016;
+  t += dt;
+  updateBlink(dt);
+
   x.clearRect(0, 0, W, H);
   x.fillStyle = '#0a0a0f';
   x.fillRect(0, 0, W, H);
@@ -259,23 +329,26 @@ function draw() {
   const gap = S.gap * sc / 2;
   const mir = document.getElementById('mirror').checked;
 
+  const blinkL = getBlinkScale(false);
+  const blinkR = getBlinkScale(true);
+
   // Left eye
-  drawEye(-gap, S.lw, S.lh, S.ltl, S.ltr, S.lbr, S.lbl, S.lrot, S.lx, S.ly, S.lskewX, S.lskewY, gx, gy);
+  drawEye(-gap, S.lw, S.lh, S.ltl, S.ltr, S.lbr, S.lbl, S.lrot, S.lx, S.ly, S.lskewX, S.lskewY, gx, gy, blinkL);
 
   // Right eye
   if (mir) {
-    drawEye(gap, S.lw, S.lh, S.ltr, S.ltl, S.lbl, S.lbr, -S.lrot, -S.lx, S.ly, -S.lskewX, -S.lskewY, gx, gy);
+    drawEye(gap, S.lw, S.lh, S.ltr, S.ltl, S.lbl, S.lbr, -S.lrot, -S.lx, S.ly, -S.lskewX, -S.lskewY, gx, gy, blinkR);
   } else {
-    drawEye(gap, S.rw, S.rh, S.rtl, S.rtr, S.rbr, S.rbl, S.rrot, S.rx, S.ry, S.rskewX, S.rskewY, gx, gy);
+    drawEye(gap, S.rw, S.rh, S.rtl, S.rtr, S.rbr, S.rbl, S.rrot, S.rx, S.ry, S.rskewX, S.rskewY, gx, gy, blinkR);
   }
 
   x.restore();
   requestAnimationFrame(draw);
 }
 
-function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy) {
+function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, blinkScale) {
   const ew = w * sc / 2;
-  const eh = Math.max(2, h * sc / 2);
+  const eh = Math.max(1.5 * sc, h * sc / 2 * (blinkScale || 1));
   const ctl = Math.min(tl, w, h) * sc / 2;
   const ctr = Math.min(tr, w, h) * sc / 2;
   const cbr = Math.min(br, w, h) * sc / 2;
@@ -289,6 +362,20 @@ function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy) {
   if (skX || skY) x.transform(1, skY, skX, 1, 0, 0);
 
   x.fillStyle = '#d7d0c8';
+
+  // If nearly closed — draw a line instead
+  if (blinkScale !== undefined && blinkScale < 0.12) {
+    x.strokeStyle = '#d7d0c8';
+    x.lineWidth = 2.5 * sc;
+    x.lineCap = 'round';
+    x.beginPath();
+    x.moveTo(-ew * 0.75, 0);
+    x.lineTo(ew * 0.75, 0);
+    x.stroke();
+    x.restore();
+    return;
+  }
+
   x.beginPath();
 
   // Top-left corner
