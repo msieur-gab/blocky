@@ -8,8 +8,7 @@ import * as faceApi from './face-api.js';
 import * as memory from './services/memory.js';
 import * as faces from './services/faces.js';
 import { play as playSound } from './services/voice.js';
-
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+import { confirmWord, sayConfident } from './revoice.js';
 
 let phase = 'idle';   // idle | waking | naming | meeting | scanning | done
 let recognition = null;
@@ -76,33 +75,39 @@ function askForName() {
   playSound('babble_question');
 
   // Listen for the child to speak
-  listenOnce((text) => {
+  listenOnce(async (text) => {
     if (!text || text.trim().length < 2) {
       // Didn't catch it — try again
       playSound('babble_question');
       faceApi.react('curious_loop');
-      listenOnce(onCreatureName);
+      listenOnce((t) => onCreatureName(t));
       return;
     }
-    onCreatureName(text);
+    await onCreatureName(text);
   });
 }
 
 async function onCreatureName(text) {
-  // Extract the most likely name (last word, or first capitalized word)
-  const name = extractName(text);
+  if (!text || text.trim().length < 2) {
+    askForName(); // retry
+    return;
+  }
 
-  console.log(`[onboarding] Creature named: "${name}"`);
-  await memory.setCreatureName(name);
+  // Extract candidate name
+  const candidate = extractName(text);
+  console.log(`[onboarding] Creature name candidate: "${candidate}"`);
 
-  // Celebrate — ami.b loves its new name!
+  // Revoice confirmation loop:
+  // Creature tries to say the name → kid confirms → locked in
+  const confirmedName = await confirmWord(candidate);
+
+  console.log(`[onboarding] Creature named: "${confirmedName}"`);
+  await memory.setCreatureName(confirmedName);
+
   phase = 'meeting';
-  playSound('fanfare');
-  faceApi.react('face_enrolled'); // starry eyes + excitement
-  faceApi.mood('excited');
 
-  // Move to meeting phase after celebration
-  setTimeout(() => askForKidName(), 3000);
+  // Move to meeting phase
+  setTimeout(() => askForKidName(), 2500);
 }
 
 // ══════════════════════════════════════════
@@ -114,42 +119,44 @@ function askForKidName() {
   faceApi.mood('curious');
   playSound('babble_question');
 
-  // Slight pause then listen
   setTimeout(() => {
     faceApi.react('thinking');
 
-    listenOnce((text) => {
+    listenOnce(async (text) => {
       if (!text || text.trim().length < 2) {
-        // Try again
         playSound('chirp_short');
-        listenOnce(onKidName);
+        listenOnce((t) => onKidName(t));
         return;
       }
-      onKidName(text);
+      await onKidName(text);
     });
   }, 800);
 }
 
 async function onKidName(text) {
-  const name = extractName(text);
+  if (!text || text.trim().length < 2) {
+    askForKidName(); // retry
+    return;
+  }
 
-  console.log(`[onboarding] Kid's name: "${name}"`);
-  await memory.setConfig('kidName', name);
+  const candidate = extractName(text);
+  console.log(`[onboarding] Kid name candidate: "${candidate}"`);
 
-  // Happy — ami.b knows its friend now!
-  playSound('chirp_up');
-  faceApi.react('love');
-  faceApi.mood('happy');
+  // Revoice: creature tries to say the kid's name
+  const confirmedName = await confirmWord(candidate);
+
+  console.log(`[onboarding] Kid's name: "${confirmedName}"`);
+  await memory.setConfig('kidName', confirmedName);
 
   // Log to journal
   await memory.log({
     category: 'onboarding',
     skillId: 'system',
-    data: { event: 'kid_named', name },
+    data: { event: 'kid_named', name: confirmedName },
   });
 
   // Move to face scanning
-  setTimeout(() => scanFace(name), 3000);
+  setTimeout(() => scanFace(confirmedName), 2500);
 }
 
 // ══════════════════════════════════════════
