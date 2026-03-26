@@ -1,13 +1,14 @@
 // ══════════════════════════════════════════
 // Magic 8-Ball Skill
-// Persistent mode: every question gets a
-// yes/no/maybe answer through face + sound
+// Persistent mode: reacts to EVERY sentence
+// with a random yes/no/maybe — pure fun
 // Say "stop" to exit
 // ══════════════════════════════════════════
 
 let ctx = null;
 let active = false;
-let answering = false; // prevent overlapping answers
+let answering = false;
+let sentenceUnsub = null;
 
 const ANSWERS = [
   // Positive
@@ -61,60 +62,75 @@ export default {
     active = true;
     answering = false;
 
-    // Enter mode — show thinking face
-    ctx.face.react('magic8_thinking');
     ctx.voice.play('powerup');
+    ctx.face.react('magic8_thinking');
     ctx.memory.log({ data: { event: 'started' } });
+
+    // Listen directly to raw sentences — bypass NLU entirely
+    sentenceUnsub = ctx.bus.onGlobal('ear:sentence', onSentence);
+    // Fallback for legacy speech service
+    ctx.bus.onGlobal('speech:sentence', onSentence);
+
     console.log('[magic8] Mode active — ask me anything');
   },
 
   deactivate() {
     active = false;
     answering = false;
+    if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
     ctx?.memory.log({ data: { event: 'stopped' } });
     ctx = null;
     console.log('[magic8] Mode ended');
   },
 
-  handleIntent(intent, entities) {
-    if (!ctx || !active) return false;
-
-    // Stop exits the mode
+  handleIntent(intent) {
+    if (!active) return false;
     if (intent === 'stop') {
       this.deactivate();
       return true;
     }
-
-    // Any other intent while active = a question to answer
-    if (answering) return true; // still answering previous question
-
-    answer();
-    return true; // catch ALL intents while in mode
+    return true; // swallow all intents while active
   },
 };
+
+function onSentence(sentence) {
+  if (!active || !ctx || answering) return;
+
+  const text = sentence.toLowerCase().trim();
+  if (!text) return;
+
+  // Check for stop
+  if (text.includes('stop') || text.includes('enough') || text.includes('exit')) {
+    ctx = null;
+    active = false;
+    if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
+    return;
+  }
+
+  answer();
+}
 
 function answer() {
   if (!ctx) return;
   answering = true;
 
-  // Think first
+  // Think
   ctx.face.react('magic8_thinking');
 
-  // Reveal answer after thinking
+  // Reveal
   setTimeout(() => {
-    if (!ctx || !active) return;
+    if (!ctx || !active) { answering = false; return; }
 
     const a = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
     ctx.face.mood(a.mood);
     ctx.voice.play(a.sound);
 
-    // Small delay then reaction (so sound hits first)
     setTimeout(() => {
-      if (!ctx || !active) return;
+      if (!ctx || !active) { answering = false; return; }
       ctx.face.react(a.reaction);
       answering = false;
     }, 200);
 
-    ctx.memory.log({ data: { type: a.reaction.includes('agree') ? 'yes' : a.reaction.includes('disagree') ? 'no' : 'maybe' } });
+    ctx.memory.log({ data: { answer: a.reaction.includes('agree') ? 'yes' : a.reaction.includes('disagree') ? 'no' : 'maybe' } });
   }, 1400);
 }
