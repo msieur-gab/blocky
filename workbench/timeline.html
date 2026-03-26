@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ami.b — Expression Timeline</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #f5f5f0;
+  color: #1a1a1a;
+  font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  height: 100vh;
+}
+
+/* Preview */
+#preview { background: #0a0a0f; display: flex; align-items: center; justify-content: center; min-height: 200px; }
+canvas { width: 80%; height: 90%; background: #0a0a0f; }
+
+/* Timeline */
+#timeline-wrap {
+  background: #fff;
+  border-top: 2px solid #e0e0e0;
+  padding: 12px 16px;
+}
+
+#timeline-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+#timeline-header h2 { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.05em; }
+#timeline-header button {
+  padding: 5px 12px; font-size: 12px; font-family: inherit;
+  background: #f0f0f0; color: #333; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;
+}
+#timeline-header button:hover { border-color: #3b82f6; }
+#timeline-header button.primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+#timeline-header button.on { background: #22c55e; color: #fff; border-color: #22c55e; }
+#timeline-header .spacer { flex: 1; }
+#timeline-header .info { font-size: 11px; color: #999; }
+
+#track {
+  display: flex; align-items: stretch; gap: 2px;
+  min-height: 70px; background: #f8f8f8; border-radius: 6px;
+  padding: 6px; overflow-x: auto;
+}
+
+.keyframe {
+  min-width: 80px; padding: 8px; border-radius: 5px;
+  background: #e8e8e8; border: 2px solid transparent;
+  cursor: pointer; position: relative; flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.keyframe:hover { border-color: #aaa; }
+.keyframe.selected { border-color: #3b82f6; background: #dbeafe; }
+.keyframe .kf-label { font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; }
+.keyframe .kf-dur {
+  font-size: 11px; color: #3b82f6; margin-top: 2px;
+  display: flex; align-items: center; gap: 4px;
+}
+.keyframe .kf-dur input {
+  width: 50px; font-size: 11px; font-family: inherit;
+  border: 1px solid #ccc; border-radius: 3px; padding: 2px 4px; text-align: center;
+}
+.keyframe .kf-ease {
+  font-size: 10px; color: #999; margin-top: 2px;
+}
+.keyframe .kf-ease select {
+  font-size: 10px; font-family: inherit; border: 1px solid #ccc; border-radius: 3px; padding: 1px;
+}
+.keyframe .kf-del {
+  position: absolute; top: 3px; right: 5px;
+  font-size: 10px; color: #ccc; cursor: pointer; line-height: 1;
+}
+.keyframe .kf-del:hover { color: #f87171; }
+
+.kf-mini-preview {
+  width: 60px; height: 30px; background: #0a0a0f; border-radius: 3px; margin-top: 4px;
+}
+
+/* Controls (side panel for selected keyframe) */
+#controls-wrap {
+  background: #fff;
+  border-top: 1px solid #eee;
+  padding: 12px 16px;
+  max-height: 45vh;
+  overflow-y: auto;
+  display: none;
+}
+#controls-wrap.on { display: block; }
+#controls-wrap h2 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #999; margin: 10px 0 5px; padding-bottom: 3px; border-bottom: 1px solid #eee;
+}
+#controls-wrap h2:first-child { margin-top: 0; }
+
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.row label { width: 55px; font-size: 12px; color: #555; flex-shrink: 0; }
+.row input[type="range"] { flex: 1; height: 5px; accent-color: #3b82f6; cursor: pointer; }
+.row .v { width: 36px; text-align: right; font-size: 12px; font-weight: 600; color: #3b82f6; }
+
+.toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.toggle label { font-size: 12px; color: #555; }
+.toggle input { width: 16px; height: 16px; }
+
+#output {
+  background: #f8f8f8; padding: 8px; border-radius: 5px;
+  font: 11px/1.3 'SF Mono', monospace; color: #666;
+  white-space: pre-wrap; max-height: 120px; overflow-y: auto; border: 1px solid #eee; margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<div id="preview"><canvas id="c"></canvas></div>
+
+<div id="timeline-wrap">
+  <div id="timeline-header">
+    <h2>Timeline</h2>
+    <button class="primary" onclick="addKeyframe()">+ Add Keyframe</button>
+    <button onclick="playTimeline()">&#9654; Play</button>
+    <button id="btn-loop" onclick="toggleLoop()">Loop</button>
+    <button onclick="stopTimeline()">&#9632; Stop</button>
+    <div class="spacer"></div>
+    <span class="info" id="play-info">stopped</span>
+    <button onclick="exportJSON()">Export JSON</button>
+  </div>
+  <div id="track"></div>
+</div>
+
+<div id="controls-wrap">
+  <h2>Selected Keyframe — Size</h2>
+  <div id="sl-size"></div>
+  <h2>Corner Radii</h2>
+  <div id="sl-corners"></div>
+  <h2>Transform</h2>
+  <div id="sl-transform"></div>
+  <div class="toggle">
+    <input type="checkbox" id="mirror" checked>
+    <label for="mirror">Mirror L → R</label>
+  </div>
+  <h2>Gaze / Head</h2>
+  <div id="sl-gaze"></div>
+  <div id="output"></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// Defaults
+// ══════════════════════════════════════════
+
+const D = {
+  lw: 40, lh: 80,
+  ltl: 40, ltr: 40, lbr: 40, lbl: 40,
+  lrot: 0, lx: 0, ly: 0, lskewX: 0, lskewY: 0,
+  rw: 40, rh: 80,
+  rtl: 40, rtr: 40, rbr: 40, rbl: 40,
+  rrot: 0, rx: 0, ry: 0, rskewX: 0, rskewY: 0,
+  gazeX: 0, gazeY: 0,
+  headTilt: 0, headX: 0, headY: 0, headScale: 1.0,
+  gap: 200,
+};
+
+// ══════════════════════════════════════════
+// Keyframes
+// ══════════════════════════════════════════
+
+let keyframes = [
+  { id: 0, label: 'calm', duration: 500, ease: 'smoothStep', state: { ...D } },
+];
+
+let nextId = 1;
+let selectedIdx = 0;
+let playing = false;
+let looping = false;
+let playIdx = 0;
+let playTimer = 0;
+let playStart = 0;
+
+// Current interpolated state for rendering
+let current = { ...D };
+
+// ══════════════════════════════════════════
+// Slider defs
+// ══════════════════════════════════════════
+
+const SL = {
+  size: [
+    { k: 'lw', l: 'width', mn: 5, mx: 80 },
+    { k: 'lh', l: 'height', mn: 5, mx: 120 },
+    { k: 'gap', l: 'gap', mn: 80, mx: 350, st: 5 },
+  ],
+  corners: [
+    { k: 'ltl', l: 'TL', mn: 0, mx: 80 },
+    { k: 'ltr', l: 'TR', mn: 0, mx: 80 },
+    { k: 'lbl', l: 'BL', mn: 0, mx: 80 },
+    { k: 'lbr', l: 'BR', mn: 0, mx: 80 },
+  ],
+  transform: [
+    { k: 'lrot', l: 'rotate', mn: -45, mx: 45 },
+    { k: 'lx', l: 'x', mn: -30, mx: 30 },
+    { k: 'ly', l: 'y', mn: -40, mx: 40 },
+    { k: 'lskewX', l: 'skewX', mn: -50, mx: 50, sc: 0.01 },
+    { k: 'lskewY', l: 'skewY', mn: -50, mx: 50, sc: 0.01 },
+  ],
+  gaze: [
+    { k: 'gazeX', l: 'gaze X', mn: -100, mx: 100, sc: 0.01 },
+    { k: 'gazeY', l: 'gaze Y', mn: -100, mx: 100, sc: 0.01 },
+    { k: 'headTilt', l: 'head tilt', mn: -30, mx: 30 },
+    { k: 'headX', l: 'head X', mn: -40, mx: 40 },
+    { k: 'headY', l: 'head Y', mn: -40, mx: 40 },
+  ],
+};
+
+// ══════════════════════════════════════════
+// Keyframe management
+// ══════════════════════════════════════════
+
+function addKeyframe() {
+  const prev = keyframes[keyframes.length - 1];
+  keyframes.push({
+    id: nextId++,
+    label: 'kf' + keyframes.length,
+    duration: 500,
+    ease: 'smoothStep',
+    state: { ...prev.state },
+  });
+  selectedIdx = keyframes.length - 1;
+  renderTrack();
+  renderControls();
+}
+
+function deleteKeyframe(idx) {
+  if (keyframes.length <= 1) return;
+  keyframes.splice(idx, 1);
+  if (selectedIdx >= keyframes.length) selectedIdx = keyframes.length - 1;
+  renderTrack();
+  renderControls();
+}
+
+function selectKeyframe(idx) {
+  selectedIdx = idx;
+  if (!playing) Object.assign(current, keyframes[idx].state);
+  renderTrack();
+  renderControls();
+}
+
+// ══════════════════════════════════════════
+// Mirror helper
+// ══════════════════════════════════════════
+
+function applyMirror(s) {
+  if (!document.getElementById('mirror').checked) return;
+  s.rw = s.lw; s.rh = s.lh;
+  s.rtl = s.ltr; s.rtr = s.ltl; s.rbl = s.lbr; s.rbr = s.lbl;
+  s.rrot = -s.lrot; s.rx = -s.lx; s.ry = s.ly;
+  s.rskewX = -s.lskewX; s.rskewY = -s.lskewY;
+}
+
+// ══════════════════════════════════════════
+// Playback
+// ══════════════════════════════════════════
+
+function playTimeline() {
+  if (keyframes.length < 2) return;
+  playing = true;
+  playIdx = 0;
+  playTimer = 0;
+  playStart = performance.now();
+  document.getElementById('play-info').textContent = 'playing...';
+}
+
+function stopTimeline() {
+  playing = false;
+  Object.assign(current, keyframes[selectedIdx].state);
+  document.getElementById('play-info').textContent = 'stopped';
+}
+
+function toggleLoop() {
+  looping = !looping;
+  document.getElementById('btn-loop').classList.toggle('on', looping);
+}
+
+function updatePlayback(dt) {
+  if (!playing || keyframes.length < 2) return;
+
+  playTimer += dt * 1000;
+  const kf = keyframes[playIdx];
+  const dur = kf.duration;
+
+  if (playTimer >= dur) {
+    playTimer -= dur;
+    playIdx++;
+
+    if (playIdx >= keyframes.length) {
+      if (looping) {
+        playIdx = 0;
+      } else {
+        playing = false;
+        document.getElementById('play-info').textContent = 'stopped';
+        return;
+      }
+    }
+
+    // Highlight current keyframe
+    document.querySelectorAll('.keyframe').forEach((el, i) => {
+      el.classList.toggle('selected', i === playIdx);
+    });
+  }
+
+  // Interpolate between current and next keyframe
+  const fromIdx = playIdx;
+  const toIdx = (playIdx + 1) % keyframes.length;
+  if (fromIdx === toIdx) return;
+
+  const from = keyframes[fromIdx].state;
+  const to = keyframes[toIdx].state;
+  const t = Math.min(1, playTimer / keyframes[fromIdx].duration);
+  const eased = applyEase(t, keyframes[fromIdx].ease);
+
+  Object.keys(D).forEach(k => {
+    current[k] = from[k] + (to[k] - from[k]) * eased;
+  });
+
+  const totalDur = keyframes.reduce((s, k) => s + k.duration, 0);
+  const elapsed = keyframes.slice(0, playIdx).reduce((s, k) => s + k.duration, 0) + playTimer;
+  document.getElementById('play-info').textContent =
+    `kf ${playIdx + 1}/${keyframes.length} — ${Math.round(elapsed)}/${totalDur}ms`;
+}
+
+function applyEase(t, type) {
+  switch (type) {
+    case 'linear': return t;
+    case 'smoothStep': return t * t * (3 - 2 * t);
+    case 'easeIn': return t * t;
+    case 'easeOut': return t * (2 - t);
+    case 'easeInOut': return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    case 'spring': {
+      const s = 1 - t;
+      return 1 - s * s * Math.cos(s * Math.PI * 2.5);
+    }
+    default: return t;
+  }
+}
+
+// ══════════════════════════════════════════
+// Canvas
+// ══════════════════════════════════════════
+
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let W, H, cx, cy, sc, time = 0;
+
+// Blink
+let blinkAmt = 0, blinkPhase = 0, blinkTimer = 3, blinksLeft = 0, blinkPause = 0;
+
+function updateBlink(dt) {
+  if (blinkPhase === 0) {
+    if (blinkPause > 0) { blinkPause -= dt; if (blinkPause <= 0) blinkPhase = 1; }
+    else { blinkTimer -= dt; if (blinkTimer <= 0) { blinksLeft = Math.random() < 0.7 ? 1 : 2; blinkPhase = 1; } }
+  }
+  const spd = blinksLeft > 1 ? 26 : 14;
+  if (blinkPhase === 1) { blinkAmt = Math.min(1, blinkAmt + dt * spd); if (blinkAmt >= 1) blinkPhase = 2; }
+  else if (blinkPhase === 2) {
+    blinkAmt = Math.max(0, blinkAmt - dt * (blinksLeft > 1 ? 20 : 10));
+    if (blinkAmt <= 0) { blinkAmt = 0; blinkPhase = 0; blinksLeft--; if (blinksLeft > 0) blinkPause = 0.05; else blinkTimer = 2 + Math.random() * 4; }
+  }
+}
+
+function resize() {
+  const d = devicePixelRatio || 1;
+  const r = c.getBoundingClientRect();
+  W = r.width || 600; H = r.height || 300;
+  c.width = W * d; c.height = H * d;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 280;
+}
+
+function draw() {
+  const dt = 0.016;
+  time += dt;
+  updateBlink(dt);
+  updatePlayback(dt);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  const s = current;
+  const breath = Math.sin(time * 1.2) * 2 * sc;
+
+  ctx.save();
+  ctx.translate(cx + (s.headX || 0) * sc, cy + (s.headY || 0) * sc + breath);
+  ctx.rotate((s.headTilt || 0) * Math.PI / 180);
+  ctx.scale(s.headScale || 1, s.headScale || 1);
+
+  const gx = (s.gazeX || 0) * 15 * sc;
+  const gy = (s.gazeY || 0) * 10 * sc;
+  const gap = (s.gap || 200) * sc / 2;
+  const bk = Math.max(0.08, 1 - blinkAmt * 0.95);
+
+  drawEye(ctx, -gap, s.lw, s.lh, s.ltl, s.ltr, s.lbr, s.lbl, s.lrot, s.lx, s.ly, s.lskewX, s.lskewY, gx, gy, bk, sc);
+  drawEye(ctx, gap, s.rw, s.rh, s.rtl, s.rtr, s.rbr, s.rbl, s.rrot, s.rx, s.ry, s.rskewX, s.rskewY, gx, gy, bk, sc);
+
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+function drawEye(x, baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, bk, sc) {
+  const ew = (w || 40) * sc / 2;
+  const eh = Math.max(1.5 * sc, (h || 80) * sc / 2 * bk);
+  const ctl = Math.min(tl || 0, w, h) * sc / 2;
+  const ctr = Math.min(tr || 0, w, h) * sc / 2;
+  const cbr = Math.min(br || 0, w, h) * sc / 2;
+  const cbl = Math.min(bl || 0, w, h) * sc / 2;
+
+  x.save();
+  x.translate(baseX + (ox || 0) * sc + gx, (oy || 0) * sc + gy);
+  x.rotate((rot || 0) * Math.PI / 180);
+  if (skX || skY) x.transform(1, skY || 0, skX || 0, 1, 0, 0);
+
+  x.fillStyle = '#d7d0c8';
+
+  if (bk < 0.12) {
+    x.strokeStyle = '#d7d0c8'; x.lineWidth = 2.5 * sc; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(-ew * 0.75, 0); x.lineTo(ew * 0.75, 0); x.stroke();
+    x.restore(); return;
+  }
+
+  x.beginPath();
+  x.moveTo(-ew + ctl, -eh);
+  x.lineTo(ew - ctr, -eh);
+  x.quadraticCurveTo(ew, -eh, ew, -eh + ctr);
+  x.lineTo(ew, eh - cbr);
+  x.quadraticCurveTo(ew, eh, ew - cbr, eh);
+  x.lineTo(-ew + cbl, eh);
+  x.quadraticCurveTo(-ew, eh, -ew, eh - cbl);
+  x.lineTo(-ew, -eh + ctl);
+  x.quadraticCurveTo(-ew, -eh, -ew + ctl, -eh);
+  x.closePath();
+  x.fill();
+  x.restore();
+}
+
+// Mini preview for keyframe thumbnails
+function drawMini(canvas, state) {
+  const mx = canvas.getContext('2d');
+  const mw = canvas.width = 120;
+  const mh = canvas.height = 60;
+  const msc = mh / 280;
+  const mcx = mw / 2;
+  const mcy = mh / 2;
+
+  mx.fillStyle = '#0a0a0f';
+  mx.fillRect(0, 0, mw, mh);
+
+  const s = state;
+  const gap = (s.gap || 200) * msc / 2;
+
+  drawEye(mx, -gap + mcx, s.lw, s.lh, s.ltl, s.ltr, s.lbr, s.lbl, s.lrot, s.lx, s.ly, 0, 0, 0, 0, 1, msc);
+  drawEye(mx, gap + mcx, s.rw, s.rh, s.rtl, s.rtr, s.rbr, s.rbl, s.rrot, s.rx, s.ry, 0, 0, 0, 0, 1, msc);
+}
+
+// ══════════════════════════════════════════
+// UI — Track
+// ══════════════════════════════════════════
+
+function renderTrack() {
+  const track = document.getElementById('track');
+  track.innerHTML = '';
+
+  keyframes.forEach((kf, i) => {
+    const div = document.createElement('div');
+    div.className = 'keyframe' + (i === selectedIdx ? ' selected' : '');
+    div.onclick = (e) => { if (!e.target.closest('.kf-del')) selectKeyframe(i); };
+
+    div.innerHTML = `
+      <div class="kf-label">${kf.label}</div>
+      <div class="kf-dur">
+        <input type="number" value="${kf.duration}" min="50" step="50"
+          onchange="keyframes[${i}].duration=parseInt(this.value)||500">ms
+      </div>
+      <div class="kf-ease">
+        <select onchange="keyframes[${i}].ease=this.value">
+          ${['smoothStep','linear','easeIn','easeOut','easeInOut','spring']
+            .map(e => `<option ${kf.ease===e?'selected':''}>${e}</option>`).join('')}
+        </select>
+      </div>
+      <canvas class="kf-mini-preview"></canvas>
+      ${keyframes.length > 1 ? `<span class="kf-del" onclick="deleteKeyframe(${i})">✕</span>` : ''}
+    `;
+
+    track.appendChild(div);
+
+    // Draw mini preview
+    const mini = div.querySelector('.kf-mini-preview');
+    drawMini(mini, kf.state);
+  });
+}
+
+// ══════════════════════════════════════════
+// UI — Controls for selected keyframe
+// ══════════════════════════════════════════
+
+function renderControls() {
+  const wrap = document.getElementById('controls-wrap');
+  wrap.classList.add('on');
+
+  const kf = keyframes[selectedIdx];
+  if (!kf) return;
+
+  Object.entries(SL).forEach(([id, defs]) => {
+    const el = document.getElementById('sl-' + id);
+    if (!el) return;
+    el.innerHTML = '';
+    defs.forEach(d => {
+      const s = d.sc || 1;
+      const st = d.st || 1;
+      const val = kf.state[d.k] || 0;
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.innerHTML = `<label>${d.l}</label><input type="range" min="${d.mn}" max="${d.mx}" step="${st}" value="${s!==1?val/s:val}"><span class="v">${s!==1?val.toFixed(2):val}</span>`;
+      const inp = div.querySelector('input');
+      const v = div.querySelector('.v');
+      inp.oninput = () => {
+        kf.state[d.k] = parseFloat(inp.value) * s;
+        v.textContent = s !== 1 ? kf.state[d.k].toFixed(2) : kf.state[d.k];
+        applyMirror(kf.state);
+        if (!playing) Object.assign(current, kf.state);
+        // Update mini preview
+        const mini = document.querySelectorAll('.kf-mini-preview')[selectedIdx];
+        if (mini) drawMini(mini, kf.state);
+      };
+      el.appendChild(div);
+    });
+  });
+}
+
+// ══════════════════════════════════════════
+// Export
+// ══════════════════════════════════════════
+
+function exportJSON() {
+  const out = keyframes.map(kf => {
+    const diff = {};
+    Object.keys(kf.state).forEach(k => {
+      if (kf.state[k] !== D[k]) diff[k] = Math.round(kf.state[k] * 100) / 100;
+    });
+    return { eyes: diff, duration: kf.duration, ease: kf.ease };
+  });
+  const json = JSON.stringify(out, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    document.getElementById('output').textContent = 'Copied!\n' + json;
+  });
+}
+
+// ══════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════
+
+window.addEventListener('resize', resize);
+renderTrack();
+renderControls();
+requestAnimationFrame(() => { resize(); draw(); });
+</script>
+</body>
+</html>
