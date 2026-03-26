@@ -13,8 +13,8 @@ import * as nlu from './services/nlu.js';
 import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
 import * as companion from './companion.js';
-import * as reactions from './reactions.js';
-import * as face from './face.js';
+import * as faceApi from './face-api.js';
+import * as reactions from './reactions.js'; // legacy — registers reaction library into face-api
 import * as rps from './games/rps.js';
 import * as personality from './personality.js';
 
@@ -41,11 +41,7 @@ const dom = {
 
 let darkTheme = true;
 
-function toggleTheme() {
-  darkTheme = !darkTheme;
-  document.body.classList.toggle('theme-light', !darkTheme);
-  face.setTheme(darkTheme);
-}
+// Theme toggle is inline in the event listener below
 
 // ── Dev panel ──
 
@@ -247,11 +243,10 @@ function loop(now) {
   // Update companion
   companion.update(dt, sensors.state);
 
-  // Reactions → face
-  reactions.setMoodExpression(companion.state.mood);
-  reactions.update(dt);
-  face.update(dt, reactions.getTarget());
-  face.draw();
+  // Face API: mood → reaction → override → render
+  faceApi.mood(companion.state.mood);
+  faceApi.update(dt);
+  faceApi.render(dt);
 
   // Dev UI at lower rate
   frameCount++;
@@ -287,10 +282,14 @@ initSheet();
 initReactionLog();
 companion.init();
 
-dom.themeToggle.addEventListener('click', toggleTheme);
-window.addEventListener('resize', () => face.resize());
+dom.themeToggle.addEventListener('click', () => {
+  darkTheme = !darkTheme;
+  document.body.classList.toggle('theme-light', !darkTheme);
+  faceApi.setTheme(darkTheme);
+});
+window.addEventListener('resize', () => faceApi.resize());
 
-face.init(dom.canvas);
-reactions.init();
+faceApi.init(dom.canvas);
+reactions.init(); // registers reaction library into face-api via bus
 lastT = performance.now();
 requestAnimationFrame(loop);
