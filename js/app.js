@@ -12,11 +12,18 @@ import * as intent from './services/intent.js';
 import * as nlu from './services/nlu.js';
 import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
-import * as companion from './companion.js';
+import * as kernel from './kernel.js';
 import * as faceApi from './face-api.js';
-import * as reactions from './reactions.js'; // legacy — registers reaction library into face-api
-import * as rps from './games/rps.js';
-import * as personality from './personality.js';
+import * as reactions from './reactions.js'; // legacy reaction library — registers into face-api
+
+// ── Skills ──
+import presenceSkill from './skills/presence.js';
+import radioSkill from './skills/radio.js';
+import rpsSkill from './skills/rps-skill.js';
+import timeSkill from './skills/time.js';
+import lookSkill from './skills/look.js';
+import faceIntroSkill from './skills/face-intro.js';
+import * as rps from './games/rps.js'; // for dev panel status only
 
 // ── DOM ──
 
@@ -134,7 +141,7 @@ function logEntry(msg) {
 const devChannel = new BroadcastChannel('blocky-dev');
 
 function broadcastState() {
-  const cs = companion.state;
+  const cs = kernel.state;
   const ss = sensors.state;
 
   devChannel.postMessage({ type: 'state', data: {
@@ -175,7 +182,7 @@ function broadcastLog(msg, type = '') {
 // ── Dev UI update ──
 
 function updateDevUI() {
-  const cs = companion.state;
+  const cs = kernel.state;
   const ss = sensors.state;
 
   dom.outMood.textContent = cs.mood;
@@ -240,11 +247,10 @@ function loop(now) {
   // Update sensors
   sensors.update(dt);
 
-  // Update companion
-  companion.update(dt, sensors.state);
+  // Update kernel
+  kernel.update(dt, sensors.state);
 
   // Face API: mood → reaction → override → render
-  faceApi.mood(companion.state.mood);
   faceApi.update(dt);
   faceApi.render(dt);
 
@@ -270,17 +276,31 @@ startGate.addEventListener('click', async () => {
   sensors.init();
   voice.init();
 
-  // Init perception layer
+  // Init perception + memory
   await memory.init();
   await faces.init();
   intent.init();
-  personality.init();
+
+  // Register skills
+  kernel.register(presenceSkill);
+  kernel.register(radioSkill);
+  kernel.register(rpsSkill);
+  kernel.register(timeSkill);
+  kernel.register(lookSkill);
+  kernel.register(faceIntroSkill);
+
+  // Activate presence as default (starts personality idle)
+  presenceSkill.activate({
+    face: faceApi, voice, memory,
+    bus: { emit: bus.emit.bind(bus), on: bus.on.bind(bus), onGlobal: bus.on.bind(bus) },
+    state: kernel.state,
+  });
 });
 
 // UI + face render immediately
 initSheet();
 initReactionLog();
-companion.init();
+kernel.init();
 
 dom.themeToggle.addEventListener('click', () => {
   darkTheme = !darkTheme;
