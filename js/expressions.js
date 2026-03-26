@@ -120,15 +120,14 @@ export const PRESETS = {
     {},
   ),
 
-  happy: asym(
-    { shape: 'smile', w: 40, h: 36, round: 40, tilt: -10 },
-    { shape: 'smile', w: 40, h: 60, round: 45 },
+  happy: sym(
+    { shape: 'arc', w: 36, h: 36 },
     { shape: 'smile', show: 1, w: 32, curve: 14 },
     { scale: 1.02 },
   ),
 
   sad: sym(
-    { shape: 'droopy', w: 30, h: 40, round: 40, tilt: -8, y: -6 },
+    { w: 30, h: 40, round: 8, tilt: -8, y: -6 },
     { shape: 'frown', show: 1, w: 22, curve: 8 },
     { y: 4, scale: 0.97 },
   ),
@@ -147,13 +146,13 @@ export const PRESETS = {
   ),
 
   bored: sym(
-    { shape: 'soft', w: 38, h: 16, round: 40, y: -6 },
+    { w: 38, h: 16, round: 8, y: -6 },
     {},
     { y: 6, scale: 0.98 },
   ),
 
   angry: sym(
-    { shape: 'sharp', w: 38, h: 30, round: 40, tilt: 12, y: -8 },
+    { w: 38, h: 30, round: 4, tilt: 12, y: -8 },
     { shape: 'line', show: 1, w: 26, curve: -4 },
     { scale: 1.04 },
     160,
@@ -212,7 +211,7 @@ export const PRESETS = {
   ),
 
   sleepy: sym(
-    { shape: 'droopy', w: 36, h: 8, round: 30, y: -4 },
+    { w: 36, h: 8, round: 4, y: -4 },
     {},
     { y: 8, scale: 0.95 },
   ),
