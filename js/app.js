@@ -21,6 +21,7 @@ import * as reactions from './reactions.js'; // legacy reaction library — regi
 import presenceSkill from './skills/presence.js';
 import radioSkill from './skills/radio.js';
 import rpsSkill, { state as rpsState, getPhase as rpsGetPhase } from './skills/rps-skill.js';
+import * as onboarding from './onboarding.js';
 import timeSkill from './skills/time.js';
 import lookSkill from './skills/look.js';
 import faceIntroSkill from './skills/face-intro.js';
@@ -276,12 +277,28 @@ startGate.addEventListener('click', async () => {
   startGate.classList.add('hidden');
 
   // These need user gesture
-  ears.init();   // two-stage listening (replaces speech.init)
   sensors.init();
   voice.init();
 
-  // Init perception + memory
+  // Init memory first — onboarding needs it
   await memory.init();
+
+  // Check: first encounter?
+  if (await onboarding.needed()) {
+    // First time — run onboarding, THEN start normal mode
+    onboarding.start(async () => {
+      console.log('[app] Onboarding complete — entering normal mode');
+      await startNormalMode();
+    });
+  } else {
+    // Returning user — go straight to normal mode
+    await startNormalMode();
+  }
+});
+
+async function startNormalMode() {
+  // Init perception
+  ears.init();
   await faces.init();
   intent.init();
 
@@ -294,13 +311,15 @@ startGate.addEventListener('click', async () => {
   kernel.register(faceIntroSkill);
   kernel.register(magic8Skill);
 
-  // Activate presence as default (starts personality idle)
+  // Activate presence as default
   presenceSkill.activate({
     face: faceApi, voice, memory,
     bus: { emit: bus.emit.bind(bus), on: bus.on.bind(bus), onGlobal: bus.on.bind(bus) },
     state: kernel.state,
   });
-});
+
+  console.log('[app] Normal mode active');
+}
 
 // UI + face render immediately
 initSheet();
