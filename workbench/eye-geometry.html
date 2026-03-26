@@ -5,153 +5,90 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ami.b — Eye Geometry Workbench</title>
 <style>
-:root {
-  --bg: #0a0a0f;
-  --surface: #141420;
-  --text: #d0d0d0;
-  --muted: #555;
-  --accent: #5b9bf6;
-  --fg: #d7d0c8;
-}
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font: 12px/1.5 'SF Mono', 'Fira Code', monospace;
+  background: #f5f5f0;
+  color: #1a1a1a;
+  font: 14px/1.6 -apple-system, 'Segoe UI', sans-serif;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 380px;
   height: 100vh;
 }
 
-/* Preview */
 #preview {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: #0a0a0f;
 }
 
-canvas {
-  width: 100%;
-  max-width: 600px;
-  aspect-ratio: 16/9;
-}
+canvas { width: 92%; height: 70vh; background: #0a0a0f; }
 
-/* Controls */
 #controls {
-  background: var(--surface);
-  padding: 12px;
+  background: #fff;
+  padding: 20px;
   overflow-y: auto;
-  border-left: 1px solid #222;
+  border-left: 2px solid #e0e0e0;
 }
 
 h2 {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin: 12px 0 6px;
+  letter-spacing: 0.05em;
+  color: #999;
+  margin: 20px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #eee;
 }
-
 h2:first-child { margin-top: 0; }
 
 .slider-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 3px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
+.slider-row label { width: 80px; font-size: 13px; color: #555; }
+.slider-row input[type="range"] { flex: 1; height: 6px; accent-color: #3b82f6; cursor: pointer; }
+.slider-row .val { width: 48px; text-align: right; font-size: 14px; font-weight: 600; color: #3b82f6; }
 
-.slider-row label {
-  width: 70px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.slider-row input[type="range"] {
-  flex: 1;
-  height: 4px;
-  accent-color: var(--accent);
-}
-
-.slider-row .val {
-  width: 40px;
-  text-align: right;
-  font-size: 11px;
-  color: var(--accent);
-}
-
-/* Presets */
 #presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin: 8px 0;
-}
-
-#presets button {
-  padding: 3px 8px;
-  font-size: 10px;
-  font-family: inherit;
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid #333;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-#presets button:hover { border-color: var(--accent); }
-#presets button.active { background: var(--accent); color: #000; border-color: var(--accent); }
-
-/* Actions */
-.actions {
-  display: flex;
   gap: 6px;
   margin: 10px 0;
 }
-
-.actions button {
-  flex: 1;
-  padding: 6px;
-  font-size: 11px;
+#presets button {
+  padding: 6px 14px;
+  font-size: 13px;
   font-family: inherit;
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 4px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   cursor: pointer;
 }
+#presets button:hover { border-color: #3b82f6; color: #3b82f6; }
+#presets button.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
 
-.actions button.secondary {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid #333;
+.actions { display: flex; gap: 8px; margin: 14px 0; }
+.actions button {
+  flex: 1; padding: 10px; font-size: 14px; font-family: inherit;
+  background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer;
 }
+.actions button.secondary { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
 
 #output {
-  background: var(--bg);
-  padding: 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  color: var(--muted);
-  white-space: pre-wrap;
-  max-height: 100px;
-  overflow-y: auto;
-  margin-top: 8px;
+  background: #f8f8f8; padding: 10px; border-radius: 6px;
+  font: 12px/1.4 'SF Mono', 'Fira Code', monospace; color: #666;
+  white-space: pre-wrap; max-height: 120px; overflow-y: auto; margin-top: 10px; border: 1px solid #eee;
 }
 
-/* Toggle */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.toggle-row label { font-size: 11px; color: var(--muted); }
+.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.toggle-row label { font-size: 13px; color: #555; }
+.toggle-row input { width: 18px; height: 18px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -161,11 +98,6 @@ h2:first-child { margin-top: 0; }
 </div>
 
 <div id="controls">
-  <h2>Eye Geometry</h2>
-  <p style="font-size:10px; color:var(--muted); margin-bottom:8px;">
-    One shape. Continuous deformation. No shape swapping.
-  </p>
-
   <h2>Base Shape</h2>
   <div id="sliders-base"></div>
 
@@ -182,7 +114,6 @@ h2:first-child { margin-top: 0; }
 
   <h2>Gaze (independent)</h2>
   <div id="sliders-gaze"></div>
-
   <div class="toggle-row">
     <input type="checkbox" id="auto-gaze" checked>
     <label for="auto-gaze">Auto wander</label>
@@ -201,57 +132,28 @@ h2:first-child { margin-top: 0; }
     <button onclick="copyJSON()">Copy JSON</button>
     <button class="secondary" onclick="resetAll()">Reset</button>
   </div>
-
   <div id="output"></div>
 </div>
 
 <script>
-// ══════════════════════════════════════════
-// Eye Geometry Model
-// One pill shape, continuous parameters
-// ══════════════════════════════════════════
-
 const DEFAULTS = {
-  // Base (shared by both eyes)
-  w: 40,        // half-width
-  h: 80,        // half-height
-  round: 50,    // corner radius
-  gap: 200,     // distance between eyes
-  y: -10,       // vertical position
-
-  // Per-eye offsets (0 = use base)
+  w: 40, h: 80, round: 50, gap: 200, y: -10,
   lw: 0, lh: 0, lround: 0, lx: 0, ly: 0, ltilt: 0,
   rw: 0, rh: 0, rround: 0, rx: 0, ry: 0, rtilt: 0,
-
-  // Gaze (independent of expression)
-  gazeX: 0,     // -1 (left) to 1 (right)
-  gazeY: 0,     // -1 (up) to 1 (down)
-
-  // Head
-  headTilt: 0,
-  headX: 0,
-  headY: 0,
-  headScale: 1,
-
-  // Micro-life
-  breathAmp: 2,
-  driftAmp: 1.5,
-  driftSpeed: 0.8,
+  gazeX: 0, gazeY: 0,
+  headTilt: 0, headX: 0, headY: 0, headScale: 1,
+  breathAmp: 2, driftAmp: 1.5, driftSpeed: 0.8,
 };
 
 const state = { ...DEFAULTS };
 
-// ══════════════════════════════════════════
-// Slider definitions
-// ══════════════════════════════════════════
-
 const SLIDERS = {
   base: [
-    { key: 'w',     label: 'width',  min: 5,  max: 80,  step: 1 },
-    { key: 'h',     label: 'height', min: 5,  max: 120, step: 1 },
-    { key: 'round', label: 'round',  min: 0,  max: 80,  step: 1 },
-    { key: 'gap',   label: 'gap',    min: 50, max: 350, step: 5 },
-    { key: 'y',     label: 'y pos',  min: -60,max: 60,  step: 1 },
+    { key: 'w',     label: 'width',  min: 5,   max: 80,  step: 1 },
+    { key: 'h',     label: 'height', min: 5,   max: 120, step: 1 },
+    { key: 'round', label: 'round',  min: 0,   max: 80,  step: 1 },
+    { key: 'gap',   label: 'gap',    min: 50,  max: 350, step: 5 },
+    { key: 'y',     label: 'y pos',  min: -60, max: 60,  step: 1 },
   ],
   left: [
     { key: 'lw',    label: 'Δ width',  min: -30, max: 30, step: 1 },
@@ -270,59 +172,52 @@ const SLIDERS = {
     { key: 'rtilt', label: 'tilt°',    min: -45, max: 45, step: 1 },
   ],
   gaze: [
-    { key: 'gazeX', label: 'X',    min: -100, max: 100, step: 1, scale: 0.01 },
-    { key: 'gazeY', label: 'Y',    min: -100, max: 100, step: 1, scale: 0.01 },
+    { key: 'gazeX', label: 'X', min: -100, max: 100, step: 1, scale: 0.01 },
+    { key: 'gazeY', label: 'Y', min: -100, max: 100, step: 1, scale: 0.01 },
   ],
   head: [
-    { key: 'headTilt',  label: 'tilt°',  min: -30,  max: 30,  step: 1 },
-    { key: 'headX',     label: 'x',      min: -40,  max: 40,  step: 1 },
-    { key: 'headY',     label: 'y',      min: -40,  max: 40,  step: 1 },
-    { key: 'headScale', label: 'scale',  min: 50,   max: 150, step: 1, scale: 0.01 },
+    { key: 'headTilt',  label: 'tilt°', min: -30,  max: 30,  step: 1 },
+    { key: 'headX',     label: 'x',     min: -40,  max: 40,  step: 1 },
+    { key: 'headY',     label: 'y',     min: -40,  max: 40,  step: 1 },
+    { key: 'headScale', label: 'scale', min: 50,   max: 150, step: 1, scale: 0.01 },
   ],
   micro: [
-    { key: 'breathAmp',  label: 'breath',  min: 0, max: 8,  step: 0.5 },
-    { key: 'driftAmp',   label: 'drift',   min: 0, max: 5,  step: 0.5 },
-    { key: 'driftSpeed', label: 'speed',   min: 0, max: 3,  step: 0.1 },
+    { key: 'breathAmp',  label: 'breath', min: 0, max: 8,  step: 0.5 },
+    { key: 'driftAmp',   label: 'drift',  min: 0, max: 5,  step: 0.5 },
+    { key: 'driftSpeed', label: 'speed',  min: 0, max: 3,  step: 0.1 },
   ],
 };
 
-// ══════════════════════════════════════════
-// Presets — all morph from pill base
-// ══════════════════════════════════════════
-
 const PRESETS = {
-  calm:     {},
-  happy:    { h: 55, round: 40, y: -5 },
-  sad:      { h: 50, w: 35, y: 5, ltilt: 15, rtilt: 15 },
-  excited:  { w: 50, h: 95, round: 50, gap: 220 },
-  scared:   { w: 50, h: 100, round: 50, gap: 240 },
-  angry:    { h: 45, w: 45, round: 20, y: 0, ltilt: -20, rtilt: -20 },
-  sleepy:   { h: 20, round: 15, y: 5 },
-  surprise: { w: 55, h: 105, round: 55, gap: 230 },
-  bored:    { h: 35, round: 25, y: 5 },
-  love:     { h: 60, w: 45, round: 45, ltilt: 10, rtilt: 10, y: -5 },
-  curious:  { lw: 5, lh: 10, rw: -5, rh: -5, ltilt: -5, rtilt: 10, headTilt: 8 },
+  calm:       {},
+  happy:      { h: 55, round: 40, y: -5 },
+  sad:        { h: 50, w: 35, y: 5, ltilt: 15, rtilt: 15 },
+  excited:    { w: 50, h: 95, round: 50, gap: 220 },
+  scared:     { w: 50, h: 100, round: 50, gap: 240 },
+  angry:      { h: 45, w: 45, round: 20, y: 0, ltilt: -20, rtilt: -20 },
+  sleepy:     { h: 20, round: 15, y: 5 },
+  surprise:   { w: 55, h: 105, round: 55, gap: 230 },
+  bored:      { h: 35, round: 25, y: 5 },
+  love:       { h: 60, w: 45, round: 45, ltilt: 10, rtilt: 10, y: -5 },
+  curious:    { lw: 5, lh: 10, rw: -5, rh: -5, ltilt: -5, rtilt: 10, headTilt: 8 },
   suspicious: { h: 30, w: 45, round: 15, ltilt: -5, rtilt: 5, lh: -5, rh: 5 },
-  thinking: { lw: -5, rw: 5, lh: -10, rh: 10, ltilt: 0, rtilt: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
-  silly:    { lw: 10, rw: -5, lh: -20, rh: 10, ltilt: 15, rtilt: -10, headTilt: -5 },
-  wink:     { lh: -55, ltilt: 0, rh: 10, rw: 5 },
+  thinking:   { lw: -5, rw: 5, lh: -10, rh: 10, ltilt: 0, rtilt: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
+  silly:      { lw: 10, rw: -5, lh: -20, rh: 10, ltilt: 15, rtilt: -10, headTilt: -5 },
+  wink:       { lh: -55, ltilt: 0, rh: 10, rw: 5 },
   determined: { h: 50, w: 45, round: 15, ltilt: -10, rtilt: -10, y: 3 },
 };
 
-// ══════════════════════════════════════════
-// Canvas renderer
-// ══════════════════════════════════════════
+// ── Canvas ──
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let W, H, cx, cy, scale;
-let t = 0;
+let W, H, cx, cy, scale, t = 0;
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  W = rect.width;
-  H = rect.height;
+  W = rect.width || 600;
+  H = rect.height || 400;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -334,58 +229,43 @@ function resize() {
 function draw() {
   t += 0.016;
   ctx.clearRect(0, 0, W, H);
-
-  const fg = '#d7d0c8';
   ctx.fillStyle = '#0a0a0f';
   ctx.fillRect(0, 0, W, H);
 
-  // Micro-life
   const breath = Math.sin(t * 1.2) * state.breathAmp * scale;
   const autoGaze = document.getElementById('auto-gaze').checked;
   const driftX = autoGaze ? Math.sin(t * state.driftSpeed) * state.driftAmp * scale : 0;
   const driftY = autoGaze ? Math.sin(t * state.driftSpeed * 0.7 + 1.3) * state.driftAmp * 0.5 * scale : 0;
 
-  // Head transform
   ctx.save();
   ctx.translate(cx + state.headX * scale, cy + state.headY * scale + breath);
   ctx.rotate(state.headTilt * Math.PI / 180);
   ctx.scale(state.headScale, state.headScale);
 
-  // Gaze offset (independent of expression)
-  const gazeOffX = state.gazeX * 15 * scale + driftX;
-  const gazeOffY = state.gazeY * 10 * scale + driftY;
-
+  const gazeX = state.gazeX * 15 * scale + driftX;
+  const gazeY = state.gazeY * 10 * scale + driftY;
   const gap = state.gap * scale / 2;
   const mirror = document.getElementById('mirror').checked;
 
-  // Draw eyes
   [
     { side: -1, dw: state.lw, dh: state.lh, dr: state.lround, dx: state.lx, dy: state.ly, dt: state.ltilt },
     { side: 1,
-      dw: mirror ? state.lw : state.rw,
-      dh: mirror ? state.lh : state.rh,
-      dr: mirror ? state.lround : state.rround,
-      dx: mirror ? -state.lx : state.rx,
-      dy: mirror ? state.ly : state.ry,
-      dt: mirror ? -state.ltilt : state.rtilt,
-    },
+      dw: mirror ? state.lw : state.rw,   dh: mirror ? state.lh : state.rh,
+      dr: mirror ? state.lround : state.rround, dx: mirror ? -state.lx : state.rx,
+      dy: mirror ? state.ly : state.ry,   dt: mirror ? -state.ltilt : state.rtilt },
   ].forEach(({ side, dw, dh, dr, dx, dy, dt }) => {
     const ew = (state.w + dw) * scale / 2;
     const eh = Math.max(2, (state.h + dh) * scale / 2);
-    const er = Math.max(0, (state.round + dr)) * scale / 2;
-
-    const ex = side * gap + (dx + side * 0) * scale + gazeOffX;
-    const ey = (state.y + dy) * scale + gazeOffY;
-    const tilt = dt * side * Math.PI / 180;
+    const er = Math.max(0, state.round + dr) * scale / 2;
+    const ex = side * gap + dx * scale + gazeX;
+    const ey = (state.y + dy) * scale + gazeY;
 
     ctx.save();
     ctx.translate(ex, ey);
-    ctx.rotate(tilt);
-
-    ctx.fillStyle = fg;
-    roundRect(ctx, ew, eh, Math.min(er, ew, eh));
+    ctx.rotate(dt * side * Math.PI / 180);
+    ctx.fillStyle = '#d7d0c8';
+    rr(ctx, ew, eh, Math.min(er, ew, eh));
     ctx.fill();
-
     ctx.restore();
   });
 
@@ -393,7 +273,7 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
-function roundRect(ctx, w, h, r) {
+function rr(ctx, w, h, r) {
   r = Math.min(r, w, h);
   ctx.beginPath();
   ctx.moveTo(-w + r, -h);
@@ -408,27 +288,24 @@ function roundRect(ctx, w, h, r) {
   ctx.closePath();
 }
 
-// ══════════════════════════════════════════
-// Build UI
-// ══════════════════════════════════════════
+// ── UI ──
 
-function buildSliders(containerId, defs) {
-  const el = document.getElementById(containerId);
+function buildSliders(id, defs) {
+  const el = document.getElementById('sliders-' + id);
   el.innerHTML = '';
   defs.forEach(def => {
     const s = def.scale || 1;
     const div = document.createElement('div');
     div.className = 'slider-row';
-    const displayVal = s !== 1 ? (state[def.key] * s).toFixed(2) : state[def.key];
     div.innerHTML = `
       <label>${def.label}</label>
-      <input type="range" min="${def.min}" max="${def.max}" step="${def.step}" value="${s !== 1 ? state[def.key] / s : state[def.key]}" data-key="${def.key}" data-scale="${s}">
-      <span class="val">${displayVal}</span>
-    `;
-    const input = div.querySelector('input');
+      <input type="range" min="${def.min}" max="${def.max}" step="${def.step}"
+        value="${s !== 1 ? state[def.key] / s : state[def.key]}" data-key="${def.key}" data-scale="${s}">
+      <span class="val">${s !== 1 ? state[def.key].toFixed(2) : state[def.key]}</span>`;
+    const inp = div.querySelector('input');
     const val = div.querySelector('.val');
-    input.addEventListener('input', () => {
-      state[def.key] = parseFloat(input.value) * s;
+    inp.addEventListener('input', () => {
+      state[def.key] = parseFloat(inp.value) * s;
       val.textContent = s !== 1 ? state[def.key].toFixed(2) : state[def.key];
     });
     el.appendChild(div);
@@ -442,10 +319,8 @@ function buildPresets() {
     const btn = document.createElement('button');
     btn.textContent = name;
     btn.addEventListener('click', () => {
-      // Reset to defaults then apply preset
       Object.assign(state, DEFAULTS, PRESETS[name]);
       rebuildAll();
-      // Highlight active
       el.querySelectorAll('button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     });
@@ -454,9 +329,7 @@ function buildPresets() {
 }
 
 function rebuildAll() {
-  Object.entries(SLIDERS).forEach(([id, defs]) => {
-    buildSliders('sliders-' + id, defs);
-  });
+  Object.keys(SLIDERS).forEach(id => buildSliders(id, SLIDERS[id]));
 }
 
 function resetAll() {
@@ -466,26 +339,20 @@ function resetAll() {
 }
 
 function copyJSON() {
-  // Output diff from defaults
   const diff = {};
-  Object.keys(state).forEach(k => {
-    if (state[k] !== DEFAULTS[k]) diff[k] = state[k];
-  });
+  Object.keys(state).forEach(k => { if (state[k] !== DEFAULTS[k]) diff[k] = state[k]; });
   const json = JSON.stringify(diff, null, 2);
   navigator.clipboard.writeText(json).then(() => {
     document.getElementById('output').textContent = 'Copied!\n' + json;
   });
 }
 
-// ══════════════════════════════════════════
-// Init
-// ══════════════════════════════════════════
+// ── Init ──
 
-resize();
 window.addEventListener('resize', resize);
 rebuildAll();
 buildPresets();
-draw();
+requestAnimationFrame(() => { resize(); draw(); });
 </script>
 </body>
 </html>
