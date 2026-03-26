@@ -171,8 +171,8 @@ function broadcastState() {
     gameScore: rpsState.score,
   }});
 
-  const t = speech.getTranscript();
-  if (t) devChannel.postMessage({ type: 'transcript', data: t });
+  const bt = ears.getTranscript() || speech.getTranscript();
+  if (bt) devChannel.postMessage({ type: 'transcript', data: bt });
 }
 
 function broadcastLog(msg, type = '') {
