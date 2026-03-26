@@ -267,48 +267,7 @@ const REACTIONS = {
   ],
 };
 
-// ── Idle behaviors (legacy — replaced by personality.js) ──
-// Kept as fallback, personality.js registers its own richer behaviors
-
-const IDLES = [
-  {
-    name: 'look_around',
-    sequence: [
-      { expr: 'curious',    duration: 600 },
-      { expr: 'calm',       duration: 400 },
-    ],
-    minInterval: 8000,
-    maxInterval: 15000,
-  },
-  {
-    name: 'blink_slow',
-    sequence: [
-      { expr: 'sleepy',     duration: 300 },
-      { expr: 'calm',       duration: 200 },
-    ],
-    minInterval: 5000,
-    maxInterval: 12000,
-  },
-  {
-    name: 'sigh',
-    sequence: [
-      { expr: 'bored',      duration: 800 },
-      { expr: 'calm',       duration: 400 },
-    ],
-    minInterval: 20000,
-    maxInterval: 40000,
-  },
-  {
-    name: 'self_amused',
-    sequence: [
-      { expr: 'thinking',   duration: 500 },
-      { expr: 'silly',      duration: 400 },
-      { expr: 'calm',       duration: 300 },
-    ],
-    minInterval: 25000,
-    maxInterval: 50000,
-  },
-];
+// Idle behaviors now live in skills/presence.js
 
 // ── Sequencer state ──
 
@@ -319,8 +278,7 @@ let sequenceTimer = 0;
 let currentTarget = resolve('calm');
 let holdExpression = null;     // mood-based default to return to
 let gameOverride = null;       // game directly sets expression, bypasses mood
-let idleTimers = [];
-let idlePaused = false;
+// idleTimers removed — idle behaviors now in skills/presence.js
 
 // ── Public API ──
 
@@ -453,28 +411,5 @@ export function update(dt) {
   }
 }
 
-// ── Idle system ──
-
-function scheduleIdles() {
-  IDLES.forEach(idle => {
-    const schedule = () => {
-      const delay = idle.minInterval + Math.random() * (idle.maxInterval - idle.minInterval);
-      const timer = setTimeout(() => {
-        if (!idlePaused && !currentSequence) {
-          currentSequence = idle.sequence;
-          sequenceIndex = 0;
-          sequenceTimer = 0;
-          currentTarget = resolve(idle.sequence[0].expr);
-        }
-        schedule(); // reschedule
-      }, delay);
-      idleTimers.push(timer);
-    };
-    schedule();
-  });
-}
-
-export function destroy() {
-  idleTimers.forEach(t => clearTimeout(t));
-  idleTimers = [];
-}
+// Legacy — kept for compatibility during migration
+export function destroy() {}
