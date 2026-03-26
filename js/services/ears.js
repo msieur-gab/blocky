@@ -36,23 +36,11 @@ export async function init() {
   // Load creature name from memory
   creatureName = await memory.getCreatureName();
 
-  if (!creatureName) {
-    console.log('[ears] No creature name set — entering naming mode');
-    startActive();
-    bus.emit('ear:naming');
-    return;
-  }
-
-  // DEV: check URL param ?wake=off to skip wake mode during development
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('wake') === 'off') {
-    console.log(`[ears] Wake mode disabled (dev) — active listening. Name: "${creatureName}"`);
-    startActive();
-    return;
-  }
-
-  console.log(`[ears] Listening for wake word: "${creatureName}"`);
-  startWake();
+  // Always start in active listening mode for now
+  // Wake word system is built but not stable enough yet
+  // TODO: re-enable wake mode when onboarding + revoice are tested
+  console.log(`[ears] Active listening (creature name: "${creatureName || 'none'}")`);
+  startActive();
 }
 
 // ── Stage 1: Wake word detection ──
@@ -193,22 +181,8 @@ function startActive() {
 }
 
 function resetActiveTimeout() {
-  if (activeTimer) clearTimeout(activeTimer);
-
-  // Never timeout if wake is disabled (dev mode)
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('wake') === 'off') return;
-
-  if (!creatureName) return; // no wake word to return to
-
-  activeTimer = setTimeout(() => {
-    if (stage === 'active') {
-      console.log('[ears] Active timeout — returning to wake mode');
-      stopActive();
-      startWake();
-      bus.emit('ami:sleep');
-    }
-  }, ACTIVE_TIMEOUT_MS);
+  // Disabled: active timeout was causing ears to go silent mid-session
+  // TODO: re-enable when wake word system is stable
 }
 
 function stopActive() {

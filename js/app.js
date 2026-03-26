@@ -290,17 +290,13 @@ startGate.addEventListener('click', async () => {
     console.log('[app] Memory wiped (reset=true)');
   }
 
-  // Check: first encounter?
-  if (await onboarding.needed()) {
-    // First time — run onboarding, THEN start normal mode
-    onboarding.start(async () => {
-      console.log('[app] Onboarding complete — entering normal mode');
-      await startNormalMode();
-    });
-  } else {
-    // Returning user — go straight to normal mode
-    await startNormalMode();
-  }
+  // Onboarding disabled for now — go straight to normal mode
+  // TODO: re-enable when revoice + naming ceremony are tested
+  // if (await onboarding.needed()) {
+  //   onboarding.start(async () => await startNormalMode());
+  // } else {
+  await startNormalMode();
+  // }
 });
 
 async function startNormalMode() {
