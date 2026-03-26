@@ -10,347 +10,376 @@
 body {
   background: #f5f5f0;
   color: #1a1a1a;
-  font: 14px/1.6 -apple-system, 'Segoe UI', sans-serif;
+  font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif;
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 400px;
   height: 100vh;
 }
 
-#preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #0a0a0f;
-}
-
+#preview { display: flex; align-items: center; justify-content: center; background: #0a0a0f; }
 canvas { width: 92%; height: 70vh; background: #0a0a0f; }
 
 #controls {
   background: #fff;
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
   border-left: 2px solid #e0e0e0;
 }
 
 h2 {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #999;
-  margin: 20px 0 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid #eee;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #999;
+  margin: 14px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #eee;
 }
 h2:first-child { margin-top: 0; }
 
-.slider-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.slider-row label { width: 80px; font-size: 13px; color: #555; }
-.slider-row input[type="range"] { flex: 1; height: 6px; accent-color: #3b82f6; cursor: pointer; }
-.slider-row .val { width: 48px; text-align: right; font-size: 14px; font-weight: 600; color: #3b82f6; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.row label { width: 55px; font-size: 12px; color: #555; flex-shrink: 0; }
+.row input[type="range"] { flex: 1; height: 5px; accent-color: #3b82f6; cursor: pointer; }
+.row .v { width: 36px; text-align: right; font-size: 12px; font-weight: 600; color: #3b82f6; }
 
-#presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 10px 0;
-}
+/* Corner radius — 4 in a row */
+.corners { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 6px; }
+.corners .row label { width: 30px; font-size: 11px; }
+
+.toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.toggle label { font-size: 12px; color: #555; }
+.toggle input { width: 16px; height: 16px; }
+
+#presets { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
 #presets button {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-family: inherit;
-  background: #f0f0f0;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  cursor: pointer;
+  padding: 5px 10px; font-size: 11px; font-family: inherit;
+  background: #f0f0f0; color: #333; border: 1px solid #ddd; border-radius: 5px; cursor: pointer;
 }
 #presets button:hover { border-color: #3b82f6; color: #3b82f6; }
-#presets button.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+#presets button.on { background: #3b82f6; color: #fff; border-color: #3b82f6; }
 
-.actions { display: flex; gap: 8px; margin: 14px 0; }
+.actions { display: flex; gap: 6px; margin: 10px 0; }
 .actions button {
-  flex: 1; padding: 10px; font-size: 14px; font-family: inherit;
-  background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+  flex: 1; padding: 7px; font-size: 12px; font-family: inherit;
+  background: #3b82f6; color: #fff; border: none; border-radius: 5px; cursor: pointer;
 }
-.actions button.secondary { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
+.actions button.sec { background: #f0f0f0; color: #333; border: 1px solid #ddd; }
 
-#output {
-  background: #f8f8f8; padding: 10px; border-radius: 6px;
-  font: 12px/1.4 'SF Mono', 'Fira Code', monospace; color: #666;
-  white-space: pre-wrap; max-height: 120px; overflow-y: auto; margin-top: 10px; border: 1px solid #eee;
+#out {
+  background: #f8f8f8; padding: 8px; border-radius: 5px;
+  font: 11px/1.3 'SF Mono', monospace; color: #666;
+  white-space: pre-wrap; max-height: 100px; overflow-y: auto; border: 1px solid #eee;
 }
 
-.toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.toggle-row label { font-size: 13px; color: #555; }
-.toggle-row input { width: 18px; height: 18px; cursor: pointer; }
+.tab-bar { display: flex; gap: 2px; margin-bottom: 8px; }
+.tab-bar button {
+  flex: 1; padding: 6px; font-size: 11px; font-family: inherit;
+  background: #f0f0f0; color: #666; border: 1px solid #ddd; border-radius: 5px 5px 0 0; cursor: pointer;
+}
+.tab-bar button.on { background: #fff; color: #1a1a1a; border-bottom-color: #fff; font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.on { display: block; }
 </style>
 </head>
 <body>
 
-<div id="preview">
-  <canvas id="canvas"></canvas>
-</div>
+<div id="preview"><canvas id="c"></canvas></div>
 
 <div id="controls">
-  <h2>Base Shape</h2>
-  <div id="sliders-base"></div>
 
-  <h2>Left Eye Offset</h2>
-  <div id="sliders-left"></div>
-
-  <h2>Right Eye Offset</h2>
-  <div id="sliders-right"></div>
-
-  <div class="toggle-row">
-    <input type="checkbox" id="mirror" checked>
-    <label for="mirror">Mirror L → R</label>
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="on" onclick="showTab('left')">Left Eye</button>
+    <button onclick="showTab('right')">Right Eye</button>
+    <button onclick="showTab('gaze')">Gaze / Head</button>
+    <button onclick="showTab('life')">Micro-Life</button>
   </div>
 
-  <h2>Gaze (independent)</h2>
-  <div id="sliders-gaze"></div>
-  <div class="toggle-row">
-    <input type="checkbox" id="auto-gaze" checked>
-    <label for="auto-gaze">Auto wander</label>
+  <!-- LEFT EYE -->
+  <div id="tab-left" class="tab-content on">
+    <h2>Size</h2>
+    <div id="sl-lsize"></div>
+    <h2>Corner Radii</h2>
+    <div class="corners" id="sl-lcorners"></div>
+    <h2>Transform</h2>
+    <div id="sl-ltransform"></div>
+    <div class="toggle">
+      <input type="checkbox" id="mirror" checked>
+      <label for="mirror">Mirror to Right Eye</label>
+    </div>
   </div>
 
-  <h2>Head</h2>
-  <div id="sliders-head"></div>
+  <!-- RIGHT EYE -->
+  <div id="tab-right" class="tab-content">
+    <h2>Size</h2>
+    <div id="sl-rsize"></div>
+    <h2>Corner Radii</h2>
+    <div class="corners" id="sl-rcorners"></div>
+    <h2>Transform</h2>
+    <div id="sl-rtransform"></div>
+  </div>
 
-  <h2>Micro-Life</h2>
-  <div id="sliders-micro"></div>
+  <!-- GAZE / HEAD -->
+  <div id="tab-gaze" class="tab-content">
+    <h2>Gaze (moves both eyes)</h2>
+    <div id="sl-gaze"></div>
+    <div class="toggle">
+      <input type="checkbox" id="auto-gaze" checked>
+      <label for="auto-gaze">Auto wander</label>
+    </div>
+    <h2>Head</h2>
+    <div id="sl-head"></div>
+    <h2>Eye Gap</h2>
+    <div id="sl-gap"></div>
+  </div>
+
+  <!-- MICRO-LIFE -->
+  <div id="tab-life" class="tab-content">
+    <h2>Breathing</h2>
+    <div id="sl-breath"></div>
+    <h2>Gaze Drift</h2>
+    <div id="sl-drift"></div>
+  </div>
 
   <h2>Presets</h2>
   <div id="presets"></div>
 
   <div class="actions">
     <button onclick="copyJSON()">Copy JSON</button>
-    <button class="secondary" onclick="resetAll()">Reset</button>
+    <button class="sec" onclick="resetAll()">Reset</button>
   </div>
-  <div id="output"></div>
+  <div id="out"></div>
 </div>
 
 <script>
-const DEFAULTS = {
-  w: 40, h: 80, round: 50, gap: 200, y: -10,
-  lw: 0, lh: 0, lround: 0, lx: 0, ly: 0, ltilt: 0,
-  rw: 0, rh: 0, rround: 0, rx: 0, ry: 0, rtilt: 0,
+// ══════════════════════════════════════════
+// State — per-eye with 4 independent corner radii
+// ══════════════════════════════════════════
+
+const D = {
+  // Left eye
+  lw: 40, lh: 80,
+  ltl: 40, ltr: 40, lbr: 40, lbl: 40,  // corner radii: top-left, top-right, bottom-right, bottom-left
+  lrot: 0, lx: 0, ly: -10, lskewX: 0, lskewY: 0,
+
+  // Right eye
+  rw: 40, rh: 80,
+  rtl: 40, rtr: 40, rbr: 40, rbl: 40,
+  rrot: 0, rx: 0, ry: -10, rskewX: 0, rskewY: 0,
+
+  // Gaze
   gazeX: 0, gazeY: 0,
-  headTilt: 0, headX: 0, headY: 0, headScale: 1,
+  // Head
+  headTilt: 0, headX: 0, headY: 0, headScale: 1.0,
+  // Gap
+  gap: 200,
+  // Micro-life
   breathAmp: 2, driftAmp: 1.5, driftSpeed: 0.8,
 };
 
-const state = { ...DEFAULTS };
+const S = { ...D };
 
-const SLIDERS = {
-  base: [
-    { key: 'w',     label: 'width',  min: 5,   max: 80,  step: 1 },
-    { key: 'h',     label: 'height', min: 5,   max: 120, step: 1 },
-    { key: 'round', label: 'round',  min: 0,   max: 80,  step: 1 },
-    { key: 'gap',   label: 'gap',    min: 50,  max: 350, step: 5 },
-    { key: 'y',     label: 'y pos',  min: -60, max: 60,  step: 1 },
-  ],
-  left: [
-    { key: 'lw',    label: 'Δ width',  min: -30, max: 30, step: 1 },
-    { key: 'lh',    label: 'Δ height', min: -60, max: 60, step: 1 },
-    { key: 'lround',label: 'Δ round',  min: -40, max: 40, step: 1 },
-    { key: 'lx',    label: 'Δ x',      min: -30, max: 30, step: 1 },
-    { key: 'ly',    label: 'Δ y',      min: -30, max: 30, step: 1 },
-    { key: 'ltilt', label: 'tilt°',    min: -45, max: 45, step: 1 },
-  ],
-  right: [
-    { key: 'rw',    label: 'Δ width',  min: -30, max: 30, step: 1 },
-    { key: 'rh',    label: 'Δ height', min: -60, max: 60, step: 1 },
-    { key: 'rround',label: 'Δ round',  min: -40, max: 40, step: 1 },
-    { key: 'rx',    label: 'Δ x',      min: -30, max: 30, step: 1 },
-    { key: 'ry',    label: 'Δ y',      min: -30, max: 30, step: 1 },
-    { key: 'rtilt', label: 'tilt°',    min: -45, max: 45, step: 1 },
-  ],
-  gaze: [
-    { key: 'gazeX', label: 'X', min: -100, max: 100, step: 1, scale: 0.01 },
-    { key: 'gazeY', label: 'Y', min: -100, max: 100, step: 1, scale: 0.01 },
-  ],
-  head: [
-    { key: 'headTilt',  label: 'tilt°', min: -30,  max: 30,  step: 1 },
-    { key: 'headX',     label: 'x',     min: -40,  max: 40,  step: 1 },
-    { key: 'headY',     label: 'y',     min: -40,  max: 40,  step: 1 },
-    { key: 'headScale', label: 'scale', min: 50,   max: 150, step: 1, scale: 0.01 },
-  ],
-  micro: [
-    { key: 'breathAmp',  label: 'breath', min: 0, max: 8,  step: 0.5 },
-    { key: 'driftAmp',   label: 'drift',  min: 0, max: 5,  step: 0.5 },
-    { key: 'driftSpeed', label: 'speed',  min: 0, max: 3,  step: 0.1 },
-  ],
+// ══════════════════════════════════════════
+// Slider definitions
+// ══════════════════════════════════════════
+
+const SL = {
+  lsize:      [{ k:'lw', l:'width', mn:5, mx:80 }, { k:'lh', l:'height', mn:5, mx:120 }],
+  lcorners:   [{ k:'ltl', l:'TL', mn:0, mx:80 }, { k:'ltr', l:'TR', mn:0, mx:80 }, { k:'lbl', l:'BL', mn:0, mx:80 }, { k:'lbr', l:'BR', mn:0, mx:80 }],
+  ltransform: [{ k:'lrot', l:'rotate', mn:-45, mx:45 }, { k:'lx', l:'x', mn:-30, mx:30 }, { k:'ly', l:'y', mn:-40, mx:40 }, { k:'lskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'lskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
+
+  rsize:      [{ k:'rw', l:'width', mn:5, mx:80 }, { k:'rh', l:'height', mn:5, mx:120 }],
+  rcorners:   [{ k:'rtl', l:'TL', mn:0, mx:80 }, { k:'rtr', l:'TR', mn:0, mx:80 }, { k:'rbl', l:'BL', mn:0, mx:80 }, { k:'rbr', l:'BR', mn:0, mx:80 }],
+  rtransform: [{ k:'rrot', l:'rotate', mn:-45, mx:45 }, { k:'rx', l:'x', mn:-30, mx:30 }, { k:'ry', l:'y', mn:-40, mx:40 }, { k:'rskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'rskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
+
+  gaze:  [{ k:'gazeX', l:'X', mn:-100, mx:100, sc:0.01 }, { k:'gazeY', l:'Y', mn:-100, mx:100, sc:0.01 }],
+  head:  [{ k:'headTilt', l:'tilt', mn:-30, mx:30 }, { k:'headX', l:'x', mn:-40, mx:40 }, { k:'headY', l:'y', mn:-40, mx:40 }, { k:'headScale', l:'scale', mn:50, mx:150, sc:0.01 }],
+  gap:   [{ k:'gap', l:'gap', mn:80, mx:350, st:5 }],
+  breath:[{ k:'breathAmp', l:'amplitude', mn:0, mx:8, st:0.5 }],
+  drift: [{ k:'driftAmp', l:'amplitude', mn:0, mx:5, st:0.5 }, { k:'driftSpeed', l:'speed', mn:0, mx:3, st:0.1 }],
 };
 
-const PRESETS = {
+// ══════════════════════════════════════════
+// Presets — from Figma reference
+// ══════════════════════════════════════════
+
+const P = {
   calm:       {},
-  happy:      { h: 55, round: 40, y: -5 },
-  sad:        { h: 50, w: 35, y: 5, ltilt: 15, rtilt: 15 },
-  excited:    { w: 50, h: 95, round: 50, gap: 220 },
-  scared:     { w: 50, h: 100, round: 50, gap: 240 },
-  angry:      { h: 45, w: 45, round: 20, y: 0, ltilt: -20, rtilt: -20 },
-  sleepy:     { h: 20, round: 15, y: 5 },
-  surprise:   { w: 55, h: 105, round: 55, gap: 230 },
-  bored:      { h: 35, round: 25, y: 5 },
-  love:       { h: 60, w: 45, round: 45, ltilt: 10, rtilt: 10, y: -5 },
-  curious:    { lw: 5, lh: 10, rw: -5, rh: -5, ltilt: -5, rtilt: 10, headTilt: 8 },
-  suspicious: { h: 30, w: 45, round: 15, ltilt: -5, rtilt: 5, lh: -5, rh: 5 },
-  thinking:   { lw: -5, rw: 5, lh: -10, rh: 10, ltilt: 0, rtilt: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
-  silly:      { lw: 10, rw: -5, lh: -20, rh: 10, ltilt: 15, rtilt: -10, headTilt: -5 },
-  wink:       { lh: -55, ltilt: 0, rh: 10, rw: 5 },
-  determined: { h: 50, w: 45, round: 15, ltilt: -10, rtilt: -10, y: 3 },
+  attentive:  { lrot: 3, rrot: -5, lh: 75, rh: 75 },
+  worried:    { lw: 30, lh: 55, rw: 30, rh: 55, ltl: 20, ltr: 25, rtl: 25, rtr: 20, lbl: 35, lbr: 35, rbl: 35, rbr: 35 },
+  curious:    { lw: 45, lh: 90, rw: 35, rh: 70, lrot: -8, rrot: 12, ltl: 45, lbl: 35, rtl: 30, rtr: 40, headTilt: 8 },
+  happy:      { lh: 60, rh: 60, ltl: 30, ltr: 30, rtl: 30, rtr: 30, lbl: 45, lbr: 45, rbl: 45, rbr: 45 },
+  sleepy:     { lh: 15, rh: 15, lw: 50, rw: 50, ltl: 10, ltr: 10, rtl: 10, rtr: 10, lbl: 10, lbr: 10, rbl: 10, rbr: 10, ly: 5, ry: 5 },
+  sad:        { lh: 70, rh: 70, ltl: 15, ltr: 30, rtl: 30, rtr: 15, lbl: 50, lbr: 40, rbl: 40, rbr: 50, lrot: 10, rrot: -10, ly: 5, ry: 5 },
+  silly:      { lw: 42, lh: 75, rw: 38, rh: 65, ltl: 50, ltr: 30, rtl: 35, rtr: 50, lbl: 30, lbr: 50, rbl: 50, rbr: 30, lrot: 12, rrot: -8 },
+  angry:      { lh: 50, rh: 50, lw: 45, rw: 45, ltl: 8, ltr: 30, rtl: 30, rtr: 8, lbl: 35, lbr: 35, rbl: 35, rbr: 35, lrot: -15, rrot: 15 },
+  excited:    { lw: 50, lh: 95, rw: 50, rh: 95, gap: 220 },
+  surprise:   { lw: 55, lh: 100, rw: 55, rh: 100, gap: 230 },
+  scared:     { lw: 48, lh: 105, rw: 48, rh: 105, gap: 240, ltl: 50, ltr: 50, rtl: 50, rtr: 50 },
+  love:       { lh: 65, rh: 65, lw: 45, rw: 45, ltl: 45, ltr: 45, rtl: 45, rtr: 45, lbl: 45, lbr: 45, rbl: 45, rbr: 45, lrot: 8, rrot: -8 },
+  suspicious: { lh: 25, rh: 30, lw: 48, rw: 45, ltl: 8, ltr: 15, rtl: 15, rtr: 8, lbl: 15, lbr: 8, rbl: 8, rbr: 15, lrot: -3, rrot: 5 },
+  thinking:   { lw: 35, lh: 70, rw: 42, rh: 85, lrot: 0, rrot: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
+  determined: { lh: 55, rh: 55, lw: 44, rw: 44, ltl: 8, ltr: 25, rtl: 25, rtr: 8, lbl: 30, lbr: 30, rbl: 30, rbr: 30, lrot: -8, rrot: 8 },
+  wink:       { lh: 8, lw: 40, ltl: 5, ltr: 5, lbl: 5, lbr: 5, rh: 85, rw: 43 },
+  bored:      { lh: 30, rh: 30, ltl: 20, ltr: 20, rtl: 20, rtr: 20, ly: 8, ry: 8 },
 };
 
-// ── Canvas ──
+// ══════════════════════════════════════════
+// Canvas
+// ══════════════════════════════════════════
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let W, H, cx, cy, scale, t = 0;
+const c = document.getElementById('c');
+const x = c.getContext('2d');
+let W, H, cx, cy, sc, t = 0;
 
 function resize() {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  W = rect.width || 600;
-  H = rect.height || 400;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  cx = W / 2;
-  cy = H / 2;
-  scale = Math.min(W, H) / 280;
+  const d = devicePixelRatio || 1;
+  const r = c.getBoundingClientRect();
+  W = r.width || 600; H = r.height || 400;
+  c.width = W * d; c.height = H * d;
+  x.setTransform(d, 0, 0, d, 0, 0);
+  cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 280;
 }
 
 function draw() {
   t += 0.016;
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#0a0a0f';
-  ctx.fillRect(0, 0, W, H);
+  x.clearRect(0, 0, W, H);
+  x.fillStyle = '#0a0a0f';
+  x.fillRect(0, 0, W, H);
 
-  const breath = Math.sin(t * 1.2) * state.breathAmp * scale;
-  const autoGaze = document.getElementById('auto-gaze').checked;
-  const driftX = autoGaze ? Math.sin(t * state.driftSpeed) * state.driftAmp * scale : 0;
-  const driftY = autoGaze ? Math.sin(t * state.driftSpeed * 0.7 + 1.3) * state.driftAmp * 0.5 * scale : 0;
+  const breath = Math.sin(t * 1.2) * S.breathAmp * sc;
+  const ag = document.getElementById('auto-gaze').checked;
+  const dx = ag ? Math.sin(t * S.driftSpeed) * S.driftAmp * sc : 0;
+  const dy = ag ? Math.sin(t * S.driftSpeed * 0.7 + 1.3) * S.driftAmp * 0.5 * sc : 0;
 
-  ctx.save();
-  ctx.translate(cx + state.headX * scale, cy + state.headY * scale + breath);
-  ctx.rotate(state.headTilt * Math.PI / 180);
-  ctx.scale(state.headScale, state.headScale);
+  // Gaze container
+  x.save();
+  x.translate(cx + S.headX * sc, cy + S.headY * sc + breath);
+  x.rotate(S.headTilt * Math.PI / 180);
+  x.scale(S.headScale, S.headScale);
 
-  const gazeX = state.gazeX * 15 * scale + driftX;
-  const gazeY = state.gazeY * 10 * scale + driftY;
-  const gap = state.gap * scale / 2;
-  const mirror = document.getElementById('mirror').checked;
+  const gx = S.gazeX * 15 * sc + dx;
+  const gy = S.gazeY * 10 * sc + dy;
+  const gap = S.gap * sc / 2;
+  const mir = document.getElementById('mirror').checked;
 
-  [
-    { side: -1, dw: state.lw, dh: state.lh, dr: state.lround, dx: state.lx, dy: state.ly, dt: state.ltilt },
-    { side: 1,
-      dw: mirror ? state.lw : state.rw,   dh: mirror ? state.lh : state.rh,
-      dr: mirror ? state.lround : state.rround, dx: mirror ? -state.lx : state.rx,
-      dy: mirror ? state.ly : state.ry,   dt: mirror ? -state.ltilt : state.rtilt },
-  ].forEach(({ side, dw, dh, dr, dx, dy, dt }) => {
-    const ew = (state.w + dw) * scale / 2;
-    const eh = Math.max(2, (state.h + dh) * scale / 2);
-    const er = Math.max(0, state.round + dr) * scale / 2;
-    const ex = side * gap + dx * scale + gazeX;
-    const ey = (state.y + dy) * scale + gazeY;
+  // Left eye
+  drawEye(-gap, S.lw, S.lh, S.ltl, S.ltr, S.lbr, S.lbl, S.lrot, S.lx, S.ly, S.lskewX, S.lskewY, gx, gy);
 
-    ctx.save();
-    ctx.translate(ex, ey);
-    ctx.rotate(dt * side * Math.PI / 180);
-    ctx.fillStyle = '#d7d0c8';
-    rr(ctx, ew, eh, Math.min(er, ew, eh));
-    ctx.fill();
-    ctx.restore();
-  });
+  // Right eye
+  if (mir) {
+    drawEye(gap, S.lw, S.lh, S.ltr, S.ltl, S.lbl, S.lbr, -S.lrot, -S.lx, S.ly, -S.lskewX, S.lskewY, gx, gy);
+  } else {
+    drawEye(gap, S.rw, S.rh, S.rtl, S.rtr, S.rbr, S.rbl, S.rrot, S.rx, S.ry, S.rskewX, S.rskewY, gx, gy);
+  }
 
-  ctx.restore();
+  x.restore();
   requestAnimationFrame(draw);
 }
 
-function rr(ctx, w, h, r) {
-  r = Math.min(r, w, h);
-  ctx.beginPath();
-  ctx.moveTo(-w + r, -h);
-  ctx.lineTo(w - r, -h);
-  ctx.quadraticCurveTo(w, -h, w, -h + r);
-  ctx.lineTo(w, h - r);
-  ctx.quadraticCurveTo(w, h, w - r, h);
-  ctx.lineTo(-w + r, h);
-  ctx.quadraticCurveTo(-w, h, -w, h - r);
-  ctx.lineTo(-w, -h + r);
-  ctx.quadraticCurveTo(-w, -h, -w + r, -h);
-  ctx.closePath();
+function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy) {
+  const ew = w * sc / 2;
+  const eh = Math.max(2, h * sc / 2);
+  const ctl = Math.min(tl, w, h) * sc / 2;
+  const ctr = Math.min(tr, w, h) * sc / 2;
+  const cbr = Math.min(br, w, h) * sc / 2;
+  const cbl = Math.min(bl, w, h) * sc / 2;
+
+  x.save();
+  x.translate(baseX + ox * sc + gx, (oy) * sc + gy);
+  x.rotate(rot * Math.PI / 180);
+
+  // Skew
+  if (skX || skY) x.transform(1, skY, skX, 1, 0, 0);
+
+  x.fillStyle = '#d7d0c8';
+  x.beginPath();
+
+  // Top-left corner
+  x.moveTo(-ew + ctl, -eh);
+  // Top edge → top-right corner
+  x.lineTo(ew - ctr, -eh);
+  x.quadraticCurveTo(ew, -eh, ew, -eh + ctr);
+  // Right edge → bottom-right corner
+  x.lineTo(ew, eh - cbr);
+  x.quadraticCurveTo(ew, eh, ew - cbr, eh);
+  // Bottom edge → bottom-left corner
+  x.lineTo(-ew + cbl, eh);
+  x.quadraticCurveTo(-ew, eh, -ew, eh - cbl);
+  // Left edge → top-left corner
+  x.lineTo(-ew, -eh + ctl);
+  x.quadraticCurveTo(-ew, -eh, -ew + ctl, -eh);
+
+  x.closePath();
+  x.fill();
+  x.restore();
 }
 
-// ── UI ──
+// ══════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════
 
-function buildSliders(id, defs) {
-  const el = document.getElementById('sliders-' + id);
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-' + name).classList.add('on');
+  event.target.classList.add('on');
+}
+
+function buildSl(id, defs) {
+  const el = document.getElementById('sl-' + id);
   el.innerHTML = '';
-  defs.forEach(def => {
-    const s = def.scale || 1;
+  defs.forEach(d => {
+    const s = d.sc || 1;
+    const st = d.st || 1;
     const div = document.createElement('div');
-    div.className = 'slider-row';
-    div.innerHTML = `
-      <label>${def.label}</label>
-      <input type="range" min="${def.min}" max="${def.max}" step="${def.step}"
-        value="${s !== 1 ? state[def.key] / s : state[def.key]}" data-key="${def.key}" data-scale="${s}">
-      <span class="val">${s !== 1 ? state[def.key].toFixed(2) : state[def.key]}</span>`;
+    div.className = 'row';
+    div.innerHTML = `<label>${d.l}</label><input type="range" min="${d.mn}" max="${d.mx}" step="${st}" value="${s!==1?S[d.k]/s:S[d.k]}"><span class="v">${s!==1?S[d.k].toFixed(2):S[d.k]}</span>`;
     const inp = div.querySelector('input');
-    const val = div.querySelector('.val');
-    inp.addEventListener('input', () => {
-      state[def.key] = parseFloat(inp.value) * s;
-      val.textContent = s !== 1 ? state[def.key].toFixed(2) : state[def.key];
-    });
+    const v = div.querySelector('.v');
+    inp.oninput = () => { S[d.k] = parseFloat(inp.value) * s; v.textContent = s!==1?S[d.k].toFixed(2):S[d.k]; };
     el.appendChild(div);
   });
+}
+
+function buildAll() {
+  Object.keys(SL).forEach(id => buildSl(id, SL[id]));
 }
 
 function buildPresets() {
   const el = document.getElementById('presets');
   el.innerHTML = '';
-  Object.keys(PRESETS).forEach(name => {
-    const btn = document.createElement('button');
-    btn.textContent = name;
-    btn.addEventListener('click', () => {
-      Object.assign(state, DEFAULTS, PRESETS[name]);
-      rebuildAll();
-      el.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-    el.appendChild(btn);
+  Object.keys(P).forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.onclick = () => {
+      Object.assign(S, D, P[n]);
+      // Mirror right from left if mirror is on and preset only defines left
+      if (document.getElementById('mirror').checked) {
+        ['rw','rh','rtl','rtr','rbr','rbl','rrot','rx','ry','rskewX','rskewY'].forEach(k => {
+          if (P[n][k] === undefined) S[k] = D[k];
+        });
+      }
+      buildAll();
+      el.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+    };
+    el.appendChild(b);
   });
 }
 
-function rebuildAll() {
-  Object.keys(SLIDERS).forEach(id => buildSliders(id, SLIDERS[id]));
-}
-
 function resetAll() {
-  Object.assign(state, DEFAULTS);
-  rebuildAll();
-  document.querySelectorAll('#presets button').forEach(b => b.classList.remove('active'));
+  Object.assign(S, D);
+  buildAll();
+  document.querySelectorAll('#presets button').forEach(b => b.classList.remove('on'));
 }
 
 function copyJSON() {
   const diff = {};
-  Object.keys(state).forEach(k => { if (state[k] !== DEFAULTS[k]) diff[k] = state[k]; });
-  const json = JSON.stringify(diff, null, 2);
-  navigator.clipboard.writeText(json).then(() => {
-    document.getElementById('output').textContent = 'Copied!\n' + json;
-  });
+  Object.keys(S).forEach(k => { if (S[k] !== D[k]) diff[k] = S[k]; });
+  const j = JSON.stringify(diff, null, 2);
+  navigator.clipboard.writeText(j).then(() => { document.getElementById('out').textContent = 'Copied!\n' + j; });
 }
 
-// ── Init ──
-
+// Init
 window.addEventListener('resize', resize);
-rebuildAll();
+buildAll();
 buildPresets();
 requestAnimationFrame(() => { resize(); draw(); });
 </script>
