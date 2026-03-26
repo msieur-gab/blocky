@@ -283,6 +283,13 @@ startGate.addEventListener('click', async () => {
   // Init memory first — onboarding needs it
   await memory.init();
 
+  // URL param ?reset=true wipes memory for fresh onboarding test
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('reset') === 'true') {
+    await memory.wipe('all');
+    console.log('[app] Memory wiped (reset=true)');
+  }
+
   // Check: first encounter?
   if (await onboarding.needed()) {
     // First time — run onboarding, THEN start normal mode
