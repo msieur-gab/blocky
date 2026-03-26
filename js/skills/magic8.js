@@ -10,25 +10,53 @@ let active = false;
 let answering = false;
 let sentenceUnsub = null;
 
-const ANSWERS = [
-  // Positive
+// ── Answer pools ──
+
+const YES = [
   { reaction: 'agree_strong',   sound: 'chirp_up',    mood: 'happy' },
   { reaction: 'agree_strong',   sound: 'fanfare',     mood: 'excited' },
   { reaction: 'agree',          sound: 'hum_happy',   mood: 'happy' },
-  { reaction: 'agree_hesitant', sound: 'chirp_short', mood: 'calm' },
-
-  // Negative
-  { reaction: 'disagree_strong', sound: 'grumble',    mood: 'angry' },
-  { reaction: 'disagree_strong', sound: 'chirp_down', mood: 'sad' },
-  { reaction: 'disagree',        sound: 'hum_sad',    mood: 'calm' },
-  { reaction: 'disagree',        sound: 'chirp_down', mood: 'calm' },
-
-  // Uncertain
-  { reaction: 'agree_hesitant',  sound: 'babble_question', mood: 'curious' },
-  { reaction: 'curious_loop',    sound: 'babble_slow',     mood: 'curious' },
-  { reaction: 'embarrassed',     sound: 'giggle',          mood: 'silly' },
-  { reaction: 'thinking',        sound: 'hum',             mood: 'curious' },
+  { reaction: 'love',           sound: 'hum_happy',   mood: 'happy' },
 ];
+
+const MAYBE = [
+  { reaction: 'agree_hesitant', sound: 'chirp_short',     mood: 'calm' },
+  { reaction: 'agree_hesitant', sound: 'babble_question', mood: 'curious' },
+  { reaction: 'curious_loop',   sound: 'babble_slow',     mood: 'curious' },
+  { reaction: 'thinking',       sound: 'hum',             mood: 'curious' },
+  { reaction: 'embarrassed',    sound: 'giggle',          mood: 'silly' },
+];
+
+const NO = [
+  { reaction: 'disagree',       sound: 'chirp_down',  mood: 'calm' },
+  { reaction: 'disagree',       sound: 'hum_sad',     mood: 'calm' },
+];
+
+// Emotional keywords — ALWAYS answer positively
+const EMOTIONAL_WORDS = new Set([
+  'love', 'like', 'friend', 'care', 'miss', 'hug', 'kiss',
+  'scared', 'afraid', 'alone', 'lonely', 'cry', 'sad',
+  'pretty', 'beautiful', 'smart', 'brave', 'strong', 'good',
+  'happy', 'best', 'favorite', 'special', 'matter',
+]);
+
+function isEmotional(text) {
+  const words = text.split(/\s+/);
+  return words.some(w => EMOTIONAL_WORDS.has(w));
+}
+
+function pickAnswer(text) {
+  // Emotional questions → always positive
+  if (isEmotional(text)) return pick(YES);
+
+  // Normal questions → weighted: 50% yes, 35% maybe, 15% mild no
+  const roll = Math.random();
+  if (roll < 0.50) return pick(YES);
+  if (roll < 0.85) return pick(MAYBE);
+  return pick(NO);
+}
+
+function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
 export default {
   id: 'magic8',
@@ -107,10 +135,10 @@ function onSentence(sentence) {
     return;
   }
 
-  answer();
+  answer(text);
 }
 
-function answer() {
+function answer(text) {
   if (!ctx) return;
   answering = true;
 
@@ -121,7 +149,7 @@ function answer() {
   setTimeout(() => {
     if (!ctx || !active) { answering = false; return; }
 
-    const a = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
+    const a = pickAnswer(text);
     ctx.face.mood(a.mood);
     ctx.voice.play(a.sound);
 
@@ -131,6 +159,7 @@ function answer() {
       answering = false;
     }, 200);
 
-    ctx.memory.log({ data: { answer: a.reaction.includes('agree') ? 'yes' : a.reaction.includes('disagree') ? 'no' : 'maybe' } });
+    const type = YES.includes(a) ? 'yes' : NO.includes(a) ? 'no' : 'maybe';
+    ctx.memory.log({ data: { answer: type, emotional: isEmotional(text) } });
   }, 1400);
 }
