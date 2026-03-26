@@ -319,6 +319,33 @@ export async function init() {
   console.log(`[nlu] Ready — ${count} exemplars embedded in ${dt}s`);
 }
 
+// ── Add exemplars from skills (called by kernel on skill registration) ──
+
+export async function addExemplars(intentExemplars) {
+  if (!session) {
+    // Model not loaded yet — queue for later
+    for (const [intent, phrases] of Object.entries(intentExemplars)) {
+      if (!INTENT_EXEMPLARS[intent]) INTENT_EXEMPLARS[intent] = [];
+      INTENT_EXEMPLARS[intent].push(...phrases);
+    }
+    return;
+  }
+
+  // Model loaded — embed immediately
+  let count = 0;
+  for (const [intent, phrases] of Object.entries(intentExemplars)) {
+    if (!exemplarEmbeddings[intent]) exemplarEmbeddings[intent] = [];
+    for (const phrase of phrases) {
+      const emb = await embed(phrase);
+      if (emb) {
+        exemplarEmbeddings[intent].push(emb);
+        count++;
+      }
+    }
+  }
+  console.log(`[nlu] Added ${count} skill exemplars`);
+}
+
 export function isReady() {
   return session !== null && Object.keys(exemplarEmbeddings).length > 0;
 }

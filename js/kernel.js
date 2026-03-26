@@ -7,6 +7,7 @@ import { bus } from './utils/events.js';
 import * as faceApi from './face-api.js';
 import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
+import * as nlu from './services/nlu.js';
 
 // ── State ──
 
@@ -72,6 +73,7 @@ export function register(skill) {
 
   // Register reactions from skill
   if (skill.reactions) faceApi.registerReactions(skill.reactions);
+  if (skill.exemplars) nlu.addExemplars(skill.exemplars);
 
   // Register skill in memory
   memory.registerSkill(skill.id, skill.name || skill.id);
