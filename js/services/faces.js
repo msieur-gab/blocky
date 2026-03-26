@@ -7,7 +7,7 @@
 
 import { bus } from '../utils/events.js';
 import * as camera from './camera.js';
-import * as storage from './storage.js';
+import * as memory from './memory.js';
 import * as faceRenderer from '../face.js';
 
 // ── Model paths ──
@@ -252,7 +252,7 @@ async function enrollFace(embedding, name, role = 'known') {
     match.embedding = emaUpdate(match.embedding, embedding);
     match.lastSeen = Date.now();
     match.seeCount++;
-    await storage.putFace(match);
+    await memory.putFace(match);
     console.log('[faces] Updated face:', name);
     bus.emit('face:enrolled', { id: match.id, name, role, updated: true });
     return match;
@@ -270,7 +270,7 @@ async function enrollFace(embedding, name, role = 'known') {
   };
 
   knownFaces.push(record);
-  await storage.putFace(record);
+  await memory.putFace(record);
   console.log('[faces] Enrolled new face:', name);
   bus.emit('face:enrolled', { id: record.id, name, role, updated: false });
   return record;
@@ -401,7 +401,7 @@ async function attemptDetection(video) {
     match.lastSeen = now;
     match.seeCount++;
     match.embedding = emaUpdate(match.embedding, embedding);
-    await storage.putFace(match);
+    await memory.putFace(match);
 
     bus.emit('face:recognized', {
       id: match.id,
@@ -431,7 +431,7 @@ export function look() {
 
 export async function init() {
   // Load known faces from storage
-  knownFaces = await storage.getFaces();
+  knownFaces = await memory.getFaces();
   console.log('[faces] Loaded', knownFaces.length, 'known faces');
 
   // Listen for introductions
@@ -495,7 +495,7 @@ export function getKnownFaces() {
 
 export async function forgetFace(id) {
   knownFaces = knownFaces.filter(f => f.id !== id);
-  await storage.deleteFace(id);
+  await memory.deleteFace(id);
   console.log('[faces] Forgot face:', id);
 }
 

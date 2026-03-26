@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ami.b — Parent Console</title>
+<script src="https://cdn.jsdelivr.net/npm/dexie@4.0.11/dist/dexie.min.js"></script>
+<style>
+:root {
+  --bg: #fafafa; --surface: #fff; --text: #1a1a1a; --muted: #888;
+  --accent: #3b82f6; --green: #22c55e; --red: #ef4444; --border: #e5e7eb;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.6 -apple-system, 'Segoe UI', sans-serif;
+  padding: 20px; max-width: 800px; margin: 0 auto;
+}
+
+h1 { font-size: 20px; margin-bottom: 8px; }
+h2 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+#pin-gate { text-align: center; padding: 60px 20px; }
+#pin-gate input { font-size: 24px; text-align: center; width: 160px; padding: 8px; border: 2px solid var(--border); border-radius: 8px; letter-spacing: 8px; }
+#pin-gate button { display: block; margin: 16px auto; padding: 8px 32px; font-size: 14px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+.card .label { color: var(--muted); font-size: 12px; }
+.card .value { font-weight: 500; }
+
+.row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+
+.btn { padding: 4px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: var(--surface); }
+.btn.approve { color: var(--green); border-color: var(--green); }
+.btn.reject { color: var(--red); border-color: var(--red); }
+.btn.danger { color: #fff; background: var(--red); border-color: var(--red); }
+.btn.export { color: var(--accent); border-color: var(--accent); }
+
+.journal-entry { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.journal-entry .time { color: var(--muted); font-size: 11px; }
+.journal-entry .cat { font-weight: 600; margin-right: 8px; }
+
+.mode-toggle { display: flex; gap: 8px; margin: 8px 0; }
+.mode-toggle button { padding: 6px 16px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; background: var(--surface); }
+.mode-toggle button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+#content { display: none; }
+</style>
+</head>
+<body>
+
+<div id="pin-gate">
+  <h1>ami.b Parent Console</h1>
+  <p style="color: var(--muted); margin-bottom: 24px;">Enter PIN to access</p>
+  <input type="password" id="pin-input" maxlength="4" placeholder="····">
+  <button onclick="checkPin()">Enter</button>
+  <p id="pin-error" style="color: var(--red); margin-top: 8px; display: none;">Wrong PIN</p>
+</div>
+
+<div id="content">
+  <h1>ami.b Parent Console</h1>
+
+  <!-- Config -->
+  <h2>Identity</h2>
+  <div id="config-section"></div>
+
+  <!-- Mode -->
+  <h2>Mode</h2>
+  <div class="mode-toggle" id="mode-toggle"></div>
+
+  <!-- Faces -->
+  <h2>Known Faces</h2>
+  <div id="faces-section"></div>
+
+  <!-- Journal -->
+  <h2>Journal</h2>
+  <div style="margin-bottom: 8px;">
+    <select id="journal-filter" onchange="loadJournal()">
+      <option value="">All categories</option>
+    </select>
+    <button class="btn export" onclick="exportData()">Export JSON</button>
+    <button class="btn export" onclick="exportData('csv')">Export CSV</button>
+  </div>
+  <div id="journal-section"></div>
+
+  <!-- Skills -->
+  <h2>Skills</h2>
+  <div id="skills-section"></div>
+
+  <!-- Danger zone -->
+  <h2>Data Management</h2>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+    <button class="btn danger" onclick="wipeFaces()">Wipe Faces</button>
+    <button class="btn danger" onclick="wipeJournal()">Wipe Journal</button>
+    <button class="btn danger" onclick="wipeAll()">Wipe Everything</button>
+  </div>
+</div>
+
+<script>
+const db = new Dexie('ami-memory');
+db.version(1).stores({
+  config: 'key',
+  faces: 'id, name, role, approved, createdAt',
+  voicePrints: 'id, role',
+  journal: '++id, timestamp, category, skillId',
+  skills: 'id, active',
+});
+
+// ── PIN ──
+
+async function checkPin() {
+  const input = document.getElementById('pin-input').value;
+  const stored = await db.config.get('parentPin');
+  const pin = stored?.value || '0000'; // default PIN
+
+  if (input === pin) {
+    document.getElementById('pin-gate').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('pin-error').style.display = 'block';
+  }
+}
+
+// ── Load ──
+
+async function loadAll() {
+  await loadConfig();
+  await loadMode();
+  await loadFaces();
+  await loadJournal();
+  await loadSkills();
+}
+
+async function loadConfig() {
+  const name = (await db.config.get('creatureName'))?.value || 'unnamed';
+  const locale = (await db.config.get('locale'))?.value || 'en';
+  document.getElementById('config-section').innerHTML = `
+    <div class="card"><div class="row">
+      <span><span class="label">Creature name</span><br><span class="value">${name}</span></span>
+    </div></div>
+    <div class="card"><div class="row">
+      <span><span class="label">Locale</span><br><span class="value">${locale}</span></span>
+    </div></div>
+  `;
+}
+
+async function loadMode() {
+  const mode = (await db.config.get('mode'))?.value || 'home';
+  document.getElementById('mode-toggle').innerHTML = ['home', 'hospital'].map(m =>
+    `<button class="${m === mode ? 'active' : ''}" onclick="setMode('${m}')">${m}</button>`
+  ).join('');
+}
+
+async function setMode(mode) {
+  await db.config.put({ key: 'mode', value: mode });
+  loadMode();
+}
+
+async function loadFaces() {
+  const faces = await db.faces.toArray();
+  const el = document.getElementById('faces-section');
+
+  if (faces.length === 0) {
+    el.innerHTML = '<div class="card" style="color: var(--muted);">No faces enrolled</div>';
+    return;
+  }
+
+  el.innerHTML = faces.map(f => `
+    <div class="card"><div class="row">
+      <span>
+        <span class="value">${f.name}</span>
+        <span class="label"> — ${f.role} (seen ${f.seeCount || 1}x)</span>
+        ${!f.approved ? '<span style="color: var(--red);"> pending</span>' : ''}
+      </span>
+      <span>
+        ${!f.approved ? `<button class="btn approve" onclick="approveFace('${f.id}')">Approve</button>` : ''}
+        <button class="btn reject" onclick="rejectFace('${f.id}')">Remove</button>
+      </span>
+    </div></div>
+  `).join('');
+}
+
+async function approveFace(id) {
+  await db.faces.update(id, { approved: true });
+  loadFaces();
+}
+
+async function rejectFace(id) {
+  if (confirm('Remove this face?')) {
+    await db.faces.delete(id);
+    loadFaces();
+  }
+}
+
+async function loadJournal() {
+  const filter = document.getElementById('journal-filter').value;
+  let entries;
+
+  if (filter) {
+    entries = await db.journal.where('category').equals(filter).reverse().limit(100).toArray();
+  } else {
+    entries = await db.journal.orderBy('timestamp').reverse().limit(100).toArray();
+  }
+
+  // Populate filter dropdown with categories
+  const categories = [...new Set((await db.journal.toArray()).map(e => e.category))];
+  const select = document.getElementById('journal-filter');
+  const current = select.value;
+  select.innerHTML = '<option value="">All categories</option>' +
+    categories.map(c => `<option value="${c}" ${c === current ? 'selected' : ''}>${c}</option>`).join('');
+
+  const el = document.getElementById('journal-section');
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="card" style="color: var(--muted);">No journal entries</div>';
+    return;
+  }
+
+  el.innerHTML = entries.map(e => `
+    <div class="journal-entry">
+      <span class="time">${new Date(e.timestamp).toLocaleString()}</span>
+      <span class="cat">${e.category}</span>
+      <span>${JSON.stringify(e.data)}</span>
+    </div>
+  `).join('');
+}
+
+async function loadSkills() {
+  const skills = await db.skills.toArray();
+  const el = document.getElementById('skills-section');
+
+  if (skills.length === 0) {
+    el.innerHTML = '<div class="card" style="color: var(--muted);">No skills registered</div>';
+    return;
+  }
+
+  el.innerHTML = skills.map(s => `
+    <div class="card"><div class="row">
+      <span class="value">${s.name || s.id}</span>
+      <span>${s.active ? 'active' : 'disabled'}</span>
+    </div></div>
+  `).join('');
+}
+
+// ── Export ──
+
+async function exportData(format = 'json') {
+  const entries = await db.journal.orderBy('timestamp').toArray();
+  let content, filename, type;
+
+  if (format === 'csv') {
+    const header = 'timestamp,category,skillId,data\n';
+    const rows = entries.map(e =>
+      `${new Date(e.timestamp).toISOString()},${e.category},${e.skillId},"${JSON.stringify(e.data).replace(/"/g, '""')}"`
+    ).join('\n');
+    content = header + rows;
+    filename = 'ami-b-journal.csv';
+    type = 'text/csv';
+  } else {
+    content = JSON.stringify(entries, null, 2);
+    filename = 'ami-b-journal.json';
+    type = 'application/json';
+  }
+
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Wipe ──
+
+async function wipeFaces() {
+  if (confirm('Remove all enrolled faces?')) {
+    await db.faces.clear();
+    loadFaces();
+  }
+}
+
+async function wipeJournal() {
+  if (confirm('Clear the entire journal?')) {
+    await db.journal.clear();
+    loadJournal();
+  }
+}
+
+async function wipeAll() {
+  if (confirm('This will erase ALL of ami.b\'s memory. Are you sure?')) {
+    await db.faces.clear();
+    await db.journal.clear();
+    await db.voicePrints.clear();
+    await db.skills.clear();
+    loadAll();
+  }
+}
+
+// Auto-focus PIN
+document.getElementById('pin-input').focus();
+document.getElementById('pin-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') checkPin();
+});
+</script>
+</body>
+</html>

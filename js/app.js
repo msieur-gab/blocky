@@ -10,7 +10,7 @@ import * as camera from './services/camera.js';
 import * as faces from './services/faces.js';
 import * as intent from './services/intent.js';
 import * as nlu from './services/nlu.js';
-import * as storage from './services/storage.js';
+import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
 import * as companion from './companion.js';
 import * as reactions from './reactions.js';
@@ -276,7 +276,7 @@ startGate.addEventListener('click', async () => {
   voice.init();
 
   // Init perception layer
-  await storage.init('home');
+  await memory.init();
   await faces.init();
   intent.init();
   personality.init();
