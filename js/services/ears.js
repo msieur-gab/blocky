@@ -266,10 +266,19 @@ function matchesWakeWord(text) {
     if (heard.includes(v)) return true;
   }
 
-  // Check each word in heard text against name with edit distance
+  // Check each word against name with edit distance (generous: up to 2)
   const words = heard.split(/\s+/);
   for (const word of words) {
-    if (editDistance(word, name) <= Math.max(1, Math.floor(name.length / 3))) {
+    const clean = word.replace(/[^a-z]/g, '');
+    if (clean.length >= 2 && editDistance(clean, name) <= 2) {
+      return true;
+    }
+  }
+
+  // Check consecutive word pairs (catches "doo doo" → "doodoo")
+  for (let i = 0; i < words.length - 1; i++) {
+    const merged = words[i].replace(/[^a-z]/g, '') + words[i + 1].replace(/[^a-z]/g, '');
+    if (editDistance(merged, name) <= 2) {
       return true;
     }
   }
@@ -285,9 +294,14 @@ function buildVariants(name) {
     variants.add(name.slice(0, i) + ' ' + name.slice(i));
   }
 
-  // Doubled vowels: "dodo" → "doodo", "dodoo"
-  // Repeated syllables: "dodo" → "doudou", "dudu"
-  const vowelSwaps = { 'o': ['ou', 'oo', 'u'], 'u': ['ou', 'oo', 'o'], 'a': ['ah', 'aa'], 'e': ['ee', 'eh'], 'i': ['ee', 'y'] };
+  // Vowel swaps: "dodo" → "doudou", "dudu", "doodoo", etc.
+  const vowelSwaps = {
+    'o': ['ou', 'oo', 'u', 'aw'],
+    'u': ['ou', 'oo', 'o'],
+    'a': ['ah', 'aa', 'uh'],
+    'e': ['ee', 'eh', 'ay'],
+    'i': ['ee', 'y', 'ie'],
+  };
   for (const [from, tos] of Object.entries(vowelSwaps)) {
     for (const to of tos) {
       if (name.includes(from)) {
@@ -296,9 +310,16 @@ function buildVariants(name) {
     }
   }
 
-  // Common suffixes speech adds: "dodo" → "dodos", "dodol"
+  // Explicit common mishearings for short names
+  // "dodo" specific but pattern works for others
+  variants.add(name + name.slice(-2)); // "dododo"
+  variants.add(name.slice(0, 2) + ' ' + name.slice(0, 2)); // "do do"
+  variants.add(name.slice(0, 3) + ' ' + name.slice(0, 3)); // "dod dod"
+  variants.add(name + 'le');  // "doodle"
+  variants.add(name + 'dle'); // "dododle"
   variants.add(name + 's');
-  variants.add(name + 'l');
+  variants.add('hey ' + name);
+  variants.add('hey ' + name.slice(0, 2) + ' ' + name.slice(2));
 
   return variants;
 }
