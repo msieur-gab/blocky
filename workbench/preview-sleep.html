@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ami.b — Sleep Preview</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 16px; }
+canvas { width: 90vw; max-width: 700px; height: 60vh; background: #0a0a0f; }
+.bar { display: flex; gap: 8px; }
+.bar button {
+  padding: 8px 20px; font: 14px -apple-system, sans-serif;
+  background: #222; color: #d0d0d0; border: 1px solid #444; border-radius: 6px; cursor: pointer;
+}
+.bar button:hover { border-color: #5b9bf6; }
+.bar .info { color: #555; font: 12px monospace; padding: 8px; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div class="bar">
+  <button onclick="playFallAsleep()">Fall Asleep</button>
+  <button onclick="playSleeping()">Sleeping (loop)</button>
+  <button onclick="playBoth()">Full Sequence</button>
+  <button onclick="wake()">Wake Up</button>
+  <span class="info" id="info">idle</span>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// Sequences from the timeline workbench
+// ══════════════════════════════════════════
+
+const DEFAULTS = {
+  lw: 40, lh: 80, ltl: 40, ltr: 40, lbr: 40, lbl: 40, lrot: 0, lx: 0, ly: 0, lskewX: 0, lskewY: 0,
+  rw: 40, rh: 80, rtl: 40, rtr: 40, rbr: 40, rbl: 40, rrot: 0, rx: 0, ry: 0, rskewX: 0, rskewY: 0,
+  gazeX: 0, gazeY: 0, headTilt: 0, headX: 0, headY: 0, headScale: 1, gap: 200,
+};
+
+const FALL_ASLEEP = [
+  { eyes: { lh: 60, rh: 60, lbr: 20, lbl: 20, rbr: 20, rbl: 20, lskewY: -0.4, rskewY: 0.4 }, duration: 200 },
+  { eyes: { lh: 20, rh: 20 }, duration: 450 },
+  { eyes: { lh: 34, rh: 34 }, duration: 200 },
+  { eyes: { lh: 10, rh: 10 }, duration: 500 },
+];
+
+const SLEEPING = [
+  { eyes: { lh: 10, rh: 10, lbr: 20, lbl: 20, rbr: 20, rbl: 20, lskewY: -0.4, rskewY: 0.4 }, duration: 2000 },
+  { eyes: { lskewY: -0.2, rskewY: 0.2 }, duration: 1000 },
+  { eyes: { lskewY: -0.4, rskewY: 0.4 }, duration: 2050 },
+  { eyes: { lskewY: -0.2, rskewY: 0.2 }, duration: 1000 },
+];
+
+// ══════════════════════════════════════════
+// Sequencer
+// ══════════════════════════════════════════
+
+let current = { ...DEFAULTS };
+let target = { ...DEFAULTS };
+let sequence = null;
+let seqIdx = 0;
+let seqTimer = 0;
+let looping = false;
+let chain = null; // next sequence after current finishes
+
+// Resolve incremental keyframes into full state
+function resolveSequence(seq) {
+  const resolved = [];
+  let running = { ...DEFAULTS };
+  seq.forEach(kf => {
+    running = { ...running, ...kf.eyes };
+    resolved.push({ state: { ...running }, duration: kf.duration, ease: kf.ease || 'smoothStep' });
+  });
+  return resolved;
+}
+
+function startSequence(seq, loop, nextSeq) {
+  sequence = resolveSequence(seq);
+  seqIdx = 0;
+  seqTimer = 0;
+  looping = loop;
+  chain = nextSeq || null;
+  // Set current to first frame immediately
+  Object.assign(target, sequence[0].state);
+}
+
+function updateSequence(dt) {
+  if (!sequence) return;
+
+  seqTimer += dt * 1000;
+  const frame = sequence[seqIdx];
+
+  if (seqTimer >= frame.duration) {
+    seqTimer -= frame.duration;
+    seqIdx++;
+
+    if (seqIdx >= sequence.length) {
+      if (looping) {
+        seqIdx = 0;
+      } else if (chain) {
+        startSequence(chain, true, null);
+        return;
+      } else {
+        sequence = null;
+        return;
+      }
+    }
+  }
+
+  // Interpolate to next frame
+  const fromIdx = seqIdx;
+  const toIdx = (seqIdx + 1) % sequence.length;
+  const from = sequence[fromIdx].state;
+  const to = sequence[toIdx].state;
+  const t = Math.min(1, seqTimer / frame.duration);
+  const e = ease(t, frame.ease);
+
+  Object.keys(DEFAULTS).forEach(k => {
+    target[k] = from[k] + (to[k] - from[k]) * e;
+  });
+
+  document.getElementById('info').textContent =
+    `kf ${seqIdx + 1}/${sequence.length}${looping ? ' (loop)' : ''}`;
+}
+
+function ease(t, type) {
+  switch (type) {
+    case 'linear': return t;
+    case 'smoothStep': return t * t * (3 - 2 * t);
+    case 'easeIn': return t * t;
+    case 'easeOut': return t * (2 - t);
+    case 'easeInOut': return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    default: return t * t * (3 - 2 * t);
+  }
+}
+
+// ══════════════════════════════════════════
+// Buttons
+// ══════════════════════════════════════════
+
+function playFallAsleep() { startSequence(FALL_ASLEEP, false, null); }
+function playSleeping() { startSequence(SLEEPING, true, null); }
+function playBoth() { startSequence(FALL_ASLEEP, false, SLEEPING); }
+function wake() {
+  sequence = null; chain = null; looping = false;
+  Object.assign(target, DEFAULTS);
+  document.getElementById('info').textContent = 'awake';
+}
+
+// ══════════════════════════════════════════
+// Renderer
+// ══════════════════════════════════════════
+
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let W, H, cx, cy, sc, time = 0;
+
+// Blink
+let bAmt = 0, bPhase = 0, bTimer = 3, bLeft = 0, bPause = 0;
+function updateBlink(dt) {
+  // Suppress blinks when eyes are nearly closed (sleeping)
+  if (target.lh < 20 && target.rh < 20) { bAmt = 0; bPhase = 0; return; }
+
+  if (bPhase === 0) {
+    if (bPause > 0) { bPause -= dt; if (bPause <= 0) bPhase = 1; }
+    else { bTimer -= dt; if (bTimer <= 0) { bLeft = Math.random() < 0.7 ? 1 : 2; bPhase = 1; } }
+  }
+  const sp = bLeft > 1 ? 26 : 14;
+  if (bPhase === 1) { bAmt = Math.min(1, bAmt + dt * sp); if (bAmt >= 1) bPhase = 2; }
+  else if (bPhase === 2) {
+    bAmt = Math.max(0, bAmt - dt * (bLeft > 1 ? 20 : 10));
+    if (bAmt <= 0) { bAmt = 0; bPhase = 0; bLeft--; if (bLeft > 0) bPause = 0.05; else bTimer = 2 + Math.random() * 4; }
+  }
+}
+
+// Smooth lerp current → target
+function lerpState(dt) {
+  const speed = 5;
+  Object.keys(DEFAULTS).forEach(k => {
+    current[k] += (target[k] - current[k]) * Math.min(1, speed * dt);
+  });
+}
+
+function resize() {
+  const d = devicePixelRatio || 1;
+  const r = c.getBoundingClientRect();
+  W = r.width || 700; H = r.height || 400;
+  c.width = W * d; c.height = H * d;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 280;
+}
+
+function draw() {
+  const dt = 0.016;
+  time += dt;
+  updateBlink(dt);
+  updateSequence(dt);
+  lerpState(dt);
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  const s = current;
+  const breath = Math.sin(time * 1.2) * 2 * sc;
+  // Micro drift
+  const dx = Math.sin(time * 0.8) * 1.5 * sc;
+  const dy = Math.sin(time * 0.56 + 1.3) * 0.8 * sc;
+
+  ctx.save();
+  ctx.translate(cx + (s.headX || 0) * sc, cy + (s.headY || 0) * sc + breath);
+  ctx.rotate((s.headTilt || 0) * Math.PI / 180);
+  ctx.scale(s.headScale || 1, s.headScale || 1);
+
+  const gx = (s.gazeX || 0) * 15 * sc + dx;
+  const gy = (s.gazeY || 0) * 10 * sc + dy;
+  const gap = (s.gap || 200) * sc / 2;
+  const bk = Math.max(0.08, 1 - bAmt * 0.95);
+
+  drawEye(-gap, s.lw, s.lh, s.ltl, s.ltr, s.lbr, s.lbl, s.lrot, s.lx, s.ly, s.lskewX, s.lskewY, gx, gy, bk);
+  drawEye(gap, s.rw, s.rh, s.rtl, s.rtr, s.rbr, s.rbl, s.rrot, s.rx, s.ry, s.rskewX, s.rskewY, gx, gy, bk);
+
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, bk) {
+  const ew = (w || 40) * sc / 2;
+  const eh = Math.max(1.5 * sc, (h || 80) * sc / 2 * bk);
+  const ctl = Math.min(tl || 0, w || 40, h || 80) * sc / 2;
+  const ctr = Math.min(tr || 0, w || 40, h || 80) * sc / 2;
+  const cbr = Math.min(br || 0, w || 40, h || 80) * sc / 2;
+  const cbl = Math.min(bl || 0, w || 40, h || 80) * sc / 2;
+
+  ctx.save();
+  ctx.translate(baseX + (ox || 0) * sc + gx, (oy || 0) * sc + gy);
+  ctx.rotate((rot || 0) * Math.PI / 180);
+  if (skX || skY) ctx.transform(1, skY || 0, skX || 0, 1, 0, 0);
+
+  ctx.fillStyle = '#d7d0c8';
+
+  if (bk < 0.12) {
+    ctx.strokeStyle = '#d7d0c8'; ctx.lineWidth = 2.5 * sc; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-ew * 0.75, 0); ctx.lineTo(ew * 0.75, 0); ctx.stroke();
+    ctx.restore(); return;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(-ew + ctl, -eh);
+  ctx.lineTo(ew - ctr, -eh);
+  ctx.quadraticCurveTo(ew, -eh, ew, -eh + ctr);
+  ctx.lineTo(ew, eh - cbr);
+  ctx.quadraticCurveTo(ew, eh, ew - cbr, eh);
+  ctx.lineTo(-ew + cbl, eh);
+  ctx.quadraticCurveTo(-ew, eh, -ew, eh - cbl);
+  ctx.lineTo(-ew, -eh + ctl);
+  ctx.quadraticCurveTo(-ew, -eh, -ew + ctl, -eh);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+window.addEventListener('resize', resize);
+requestAnimationFrame(() => { resize(); draw(); });
+</script>
+</body>
+</html>
