@@ -283,8 +283,9 @@ let gameOverride = null;       // game directly sets expression, bypasses mood
 // ── Public API ──
 
 export function init() {
-  // Don't schedule old idles — personality.js handles this now
-  // scheduleIdles();
+  // Push all built-in reactions to face-api
+  bus.emit('reactions:register', REACTIONS);
+
   bus.on('reaction:trigger', trigger);
 
   // Allow other modules to register new reactions dynamically
