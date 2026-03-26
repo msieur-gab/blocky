@@ -70,6 +70,14 @@ export const eyes = {
     ctx.fill();
   },
 
+  // Smile — tighter top, rounder bottom (happy, warm, friendly)
+  smile(ctx, w, h, r) {
+    const top = Math.min(r * 0.7, w, h);
+    const bot = Math.min(r * 1.1, w, h);
+    roundRect4(ctx, w, h, top, top, bot, bot);
+    ctx.fill();
+  },
+
   // Soft — all corners reduced (worried, small, cautious)
   soft(ctx, w, h, r) {
     const s = Math.min(r * 0.5, w, h);

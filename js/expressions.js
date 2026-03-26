@@ -120,8 +120,9 @@ export const PRESETS = {
     {},
   ),
 
-  happy: sym(
-    { shape: 'arc', w: 36, h: 36 },
+  happy: asym(
+    { shape: 'smile', w: 40, h: 36, round: 40, tilt: -10 },
+    { shape: 'smile', w: 40, h: 60, round: 45 },
     { shape: 'smile', show: 1, w: 32, curve: 14 },
     { scale: 1.02 },
   ),
