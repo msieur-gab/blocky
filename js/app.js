@@ -20,11 +20,11 @@ import * as reactions from './reactions.js'; // legacy reaction library — regi
 // ── Skills ──
 import presenceSkill from './skills/presence.js';
 import radioSkill from './skills/radio.js';
-import rpsSkill from './skills/rps-skill.js';
+import rpsSkill, { state as rpsState, getPhase as rpsGetPhase } from './skills/rps-skill.js';
 import timeSkill from './skills/time.js';
 import lookSkill from './skills/look.js';
 import faceIntroSkill from './skills/face-intro.js';
-import * as rps from './games/rps.js'; // for dev panel status only
+// rps state imported above with rpsSkill
 
 // ── DOM ──
 
@@ -165,9 +165,9 @@ function broadcastState() {
     earsStage: ears.getStage(),
     creatureName: ears.getCreatureName() || 'unnamed',
     knownFaces: faces.getKnownFaces(),
-    gamePhase: rps.getPhase(),
-    gameRound: rps.state.round,
-    gameScore: rps.state.score,
+    gamePhase: rpsGetPhase(),
+    gameRound: rpsState.round,
+    gameScore: rpsState.score,
   }});
 
   const t = speech.getTranscript();
@@ -203,7 +203,7 @@ function updateDevUI() {
     ['attention', cs.attention.toFixed(2)],
     ['silence', cs.silenceDuration.toFixed(1) + 's'],
     ['intent', cs.lastIntent || '—'],
-    ['game', cs.mode === 'game' ? `${rps.getPhase()} R${rps.state.round} (${rps.state.score.player}:${rps.state.score.blocky})` : '—'],
+    ['game', cs.mode === 'game' ? `${rpsGetPhase()} R${rpsState.round} (${rpsState.score.player}:${rpsState.score.blocky})` : '—'],
     ['face', cs.currentFace ? cs.currentFace.name : '—'],
   ].map(([k, v]) =>
     `<div class="dev-row"><span class="dev-label">${k}</span><span class="dev-value">${v}</span></div>`
