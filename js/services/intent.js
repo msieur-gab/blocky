@@ -75,11 +75,32 @@ const NAME_PATTERNS = [
 ];
 
 const STOP_WORDS = new Set([
-  'blocky', 'happy', 'sad', 'scared', 'angry', 'bored', 'hungry',
-  'tired', 'here', 'there', 'fine', 'good', 'great', 'okay',
-  'sorry', 'ready', 'done', 'back', 'not', 'very', 'really',
-  'so', 'just', 'also', 'a', 'the', 'your', 'his', 'her',
+  // Blocky
+  'blocky',
+  // Emotions / states
+  'happy', 'sad', 'scared', 'angry', 'bored', 'hungry', 'tired',
+  'sleepy', 'excited', 'lonely', 'sick', 'cold', 'hot', 'thirsty',
+  'fine', 'good', 'great', 'okay', 'alright', 'better', 'worse',
+  // Actions (I am + verb/gerund)
+  'joking', 'kidding', 'playing', 'sleeping', 'eating', 'running',
+  'going', 'coming', 'leaving', 'waiting', 'watching', 'listening',
+  'thinking', 'trying', 'looking', 'talking', 'singing', 'dancing',
+  'reading', 'drawing', 'winning', 'losing', 'lying', 'sitting',
+  'standing', 'walking', 'crying', 'laughing', 'dreaming',
+  // Common words
+  'here', 'there', 'sorry', 'ready', 'done', 'back', 'home',
+  'not', 'very', 'really', 'so', 'just', 'also', 'still', 'only',
+  'a', 'the', 'your', 'his', 'her', 'my', 'our', 'their',
   'something', 'nothing', 'anything', 'everything', 'please',
+  'sure', 'right', 'wrong', 'lost', 'late', 'early',
+  // Body parts
+  'finger', 'fingers', 'hand', 'hands', 'face', 'eyes', 'nose',
+  'mouth', 'head', 'arm', 'arms', 'leg', 'legs', 'foot', 'feet',
+  'ear', 'ears', 'hair', 'belly', 'tummy',
+  // Common mis-enrollments
+  'doing', 'nice', 'like', 'looking', 'funny', 'laugh', 'lucky',
+  'game', 'broken', 'working', 'what', 'stop', 'this', 'that',
+  'it', 'up', 'down', 'out', 'off', 'on', 'over', 'about',
 ]);
 
 function extractName(text) {
@@ -114,6 +135,14 @@ export const INTENT_MAP = {
   question:      { reaction: 'curious_loop',  mood: 'curious' },
   love:          { reaction: 'love',          mood: 'happy' },
   secret:        { reaction: 'embarrassed',   mood: 'silly' },
+  agree:         { reaction: 'agree',          mood: 'calm' },
+  agree_strong:  { reaction: 'agree_strong',   mood: 'happy' },
+  disagree:      { reaction: 'disagree',       mood: 'calm' },
+  disagree_strong: { reaction: 'disagree_strong', mood: 'angry' },
+  negation:      { reaction: null,            mood: 'calm' },
+  look:          { reaction: 'attention',     mood: 'curious' },
+  time:          { reaction: null,            mood: 'calm' },
+  stop:          { reaction: null,            mood: 'calm' },
   // introduction has no fixed reaction — triggers camera via faces.js
 };
 

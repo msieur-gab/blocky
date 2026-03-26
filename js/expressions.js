@@ -73,6 +73,37 @@ function asym(left, right, mouth, faceXform, gap) {
   };
 }
 
+// ── Dynamic expressions ──
+
+const DIGIT_SHAPES = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+
+// Create a two-digit time expression: left eye = tens, right eye = ones
+export function makeTimeExpression(hours, minutes) {
+  const h1 = Math.floor(hours / 10);
+  const h0 = hours % 10;
+
+  return {
+    eyeGap: 200,
+    leftEye:  { ...DEFAULT_EYE, shape: DIGIT_SHAPES[h1] || 'zero', w: 26, h: 40 },
+    rightEye: { ...DEFAULT_EYE, shape: DIGIT_SHAPES[h0] || 'zero', w: 26, h: 40 },
+    mouth:    { ...DEFAULT_MOUTH, show: 0 },
+    face:     { ...DEFAULT_FACE, scale: 1.1 },
+  };
+}
+
+export function makeMinuteExpression(minutes) {
+  const m1 = Math.floor(minutes / 10);
+  const m0 = minutes % 10;
+
+  return {
+    eyeGap: 200,
+    leftEye:  { ...DEFAULT_EYE, shape: DIGIT_SHAPES[m1] || 'zero', w: 26, h: 40 },
+    rightEye: { ...DEFAULT_EYE, shape: DIGIT_SHAPES[m0] || 'zero', w: 26, h: 40 },
+    mouth:    { ...DEFAULT_MOUTH, show: 0 },
+    face:     { ...DEFAULT_FACE, scale: 1.1 },
+  };
+}
+
 // ── Presets ──
 
 export const PRESETS = {
@@ -264,6 +295,46 @@ export const PRESETS = {
     { shape: 'musicNote', w: 24, h: 30, y: -8 },
     { shape: 'circle', show: 1, w: 28, h: 28, open: 1, y: 40 },
     { tilt: 2 },
+  ),
+
+  // ── Game: Countdown ──
+
+  countdown_3: sym(
+    { shape: 'three', w: 30, h: 44 },
+    { show: 0 },
+    { scale: 1.1 },
+  ),
+
+  countdown_2: sym(
+    { shape: 'two', w: 30, h: 44 },
+    { show: 0 },
+    { scale: 1.1 },
+  ),
+
+  countdown_1: sym(
+    { shape: 'one', w: 30, h: 44 },
+    { show: 0 },
+    { scale: 1.15 },
+  ),
+
+  // ── Game: RPS moves ──
+
+  rps_rock: sym(
+    { shape: 'rock', w: 36, h: 36 },
+    { show: 0 },
+    { scale: 1.05 },
+  ),
+
+  rps_paper: sym(
+    { shape: 'paper', w: 44, h: 30, round: 6 },
+    { show: 0 },
+    { scale: 1.05 },
+  ),
+
+  rps_scissors: sym(
+    { shape: 'scissors', w: 30, h: 40 },
+    { show: 0 },
+    { scale: 1.05 },
   ),
 
   dead: sym(

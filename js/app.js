@@ -15,6 +15,8 @@ import * as voice from './services/voice.js';
 import * as companion from './companion.js';
 import * as reactions from './reactions.js';
 import * as face from './face.js';
+import * as rps from './games/rps.js';
+import * as personality from './personality.js';
 
 // ── DOM ──
 
@@ -90,6 +92,29 @@ function initReactionLog() {
     logEntry(msg);
     broadcastLog(msg, 'intent');
   });
+  bus.on('game:countdown', ({ number }) => {
+    broadcastLog(`countdown: ${number}`, 'reaction');
+  });
+  bus.on('game:reveal', ({ move }) => {
+    const msg = `blocky plays: ${move}`;
+    logEntry(msg);
+    broadcastLog(msg, 'reaction');
+  });
+  bus.on('game:result', ({ winner, blocky, player, score }) => {
+    const msg = winner
+      ? `${winner} wins! (${player} vs ${blocky}) — ${score?.player || 0}:${score?.blocky || 0}`
+      : 'no hand detected';
+    logEntry(msg);
+    broadcastLog(msg, 'reaction');
+  });
+  bus.on('gesture:detected', ({ gesture, confidence, raw }) => {
+    const msg = `hand: ${gesture} (${(confidence * 100).toFixed(0)}%) [${raw}]`;
+    logEntry(msg);
+    broadcastLog(msg, 'face');
+  });
+  bus.on('gesture:raw', ({ raw, confidence }) => {
+    broadcastLog(`raw gesture: ${raw} (${(confidence * 100).toFixed(0)}%)`, '');
+  });
 }
 
 function logEntry(msg) {
@@ -134,6 +159,9 @@ function broadcastState() {
     rotating: ss.rotating ? 'yes' : 'no',
     faceDown: ss.faceDown ? 'yes' : 'no',
     knownFaces: faces.getKnownFaces(),
+    gamePhase: rps.getPhase(),
+    gameRound: rps.state.round,
+    gameScore: rps.state.score,
   }});
 
   const t = speech.getTranscript();
@@ -169,6 +197,7 @@ function updateDevUI() {
     ['attention', cs.attention.toFixed(2)],
     ['silence', cs.silenceDuration.toFixed(1) + 's'],
     ['intent', cs.lastIntent || '—'],
+    ['game', cs.mode === 'game' ? `${rps.getPhase()} R${rps.state.round} (${rps.state.score.player}:${rps.state.score.blocky})` : '—'],
     ['face', cs.currentFace ? cs.currentFace.name : '—'],
   ].map(([k, v]) =>
     `<div class="dev-row"><span class="dev-label">${k}</span><span class="dev-value">${v}</span></div>`
@@ -250,6 +279,7 @@ startGate.addEventListener('click', async () => {
   await storage.init('home');
   await faces.init();
   intent.init();
+  personality.init();
 });
 
 // UI + face render immediately

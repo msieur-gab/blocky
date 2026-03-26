@@ -140,6 +140,161 @@ export const eyes = {
     ctx.lineTo(hw, hh);
     ctx.stroke();
   },
+
+  // ── Numbers (0-9) ──
+
+  zero(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s * 0.5, s, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+
+  one(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.6);
+    ctx.lineTo(s * 0.1, -s);
+    ctx.lineTo(s * 0.1, s);
+    ctx.moveTo(-s * 0.4, s);
+    ctx.lineTo(s * 0.5, s);
+    ctx.stroke();
+  },
+
+  two(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.5, -s * 0.6);
+    ctx.quadraticCurveTo(-s * 0.5, -s, s * 0.3, -s);
+    ctx.quadraticCurveTo(s * 0.9, -s, s * 0.7, -s * 0.3);
+    ctx.quadraticCurveTo(s * 0.3, s * 0.2, -s * 0.6, s);
+    ctx.lineTo(s * 0.6, s);
+    ctx.stroke();
+  },
+
+  three(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.5, -s);
+    ctx.lineTo(s * 0.3, -s);
+    ctx.quadraticCurveTo(s * 0.8, -s * 0.5, 0, -s * 0.1);
+    ctx.quadraticCurveTo(s * 0.9, s * 0.4, s * 0.3, s);
+    ctx.lineTo(-s * 0.5, s);
+    ctx.stroke();
+  },
+
+  four(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.3, s);
+    ctx.lineTo(s * 0.3, -s);
+    ctx.lineTo(-s * 0.6, s * 0.3);
+    ctx.lineTo(s * 0.6, s * 0.3);
+    ctx.stroke();
+  },
+
+  five(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.5, -s);
+    ctx.lineTo(-s * 0.4, -s);
+    ctx.lineTo(-s * 0.5, -s * 0.1);
+    ctx.quadraticCurveTo(s * 0.7, -s * 0.3, s * 0.6, s * 0.3);
+    ctx.quadraticCurveTo(s * 0.5, s, -s * 0.4, s);
+    ctx.stroke();
+  },
+
+  six(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.3, -s);
+    ctx.quadraticCurveTo(-s * 0.7, -s * 0.2, -s * 0.5, s * 0.3);
+    ctx.quadraticCurveTo(-s * 0.5, s, 0, s);
+    ctx.quadraticCurveTo(s * 0.6, s, s * 0.6, s * 0.3);
+    ctx.quadraticCurveTo(s * 0.6, -s * 0.1, 0, -s * 0.1);
+    ctx.quadraticCurveTo(-s * 0.5, -s * 0.1, -s * 0.5, s * 0.3);
+    ctx.stroke();
+  },
+
+  seven(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.5, -s);
+    ctx.lineTo(s * 0.5, -s);
+    ctx.lineTo(-s * 0.1, s);
+    ctx.stroke();
+  },
+
+  eight(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.ellipse(0, -s * 0.5, s * 0.4, s * 0.45, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.45, s * 0.45, s * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+
+  nine(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, s);
+    ctx.quadraticCurveTo(s * 0.7, s * 0.2, s * 0.5, -s * 0.3);
+    ctx.quadraticCurveTo(s * 0.5, -s, 0, -s);
+    ctx.quadraticCurveTo(-s * 0.6, -s, -s * 0.6, -s * 0.3);
+    ctx.quadraticCurveTo(-s * 0.6, s * 0.1, 0, s * 0.1);
+    ctx.quadraticCurveTo(s * 0.5, s * 0.1, s * 0.5, -s * 0.3);
+    ctx.stroke();
+  },
+
+  // ── RPS game shapes ──
+
+  // Rock — solid fist (filled circle with knuckle line)
+  rock(ctx, w, h) {
+    const r = Math.min(w, h) * 0.9;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Knuckle line
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.15, r * 0.7, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+  },
+
+  // Paper — open flat hand (wide rounded rect)
+  paper(ctx, w, h) {
+    const pw = w * 0.95;
+    const ph = h * 0.7;
+    roundRect(ctx, pw, ph, Math.min(pw, ph) * 0.3);
+    ctx.fill();
+    // Finger lines
+    const lineY = [-ph * 0.35, 0, ph * 0.35];
+    for (const y of lineY) {
+      ctx.beginPath();
+      ctx.moveTo(-pw * 0.5, y);
+      ctx.lineTo(pw * 0.5, y);
+      ctx.stroke();
+    }
+  },
+
+  // Scissors — two crossed lines (✂)
+  scissors(ctx, w, h) {
+    const s = Math.min(w, h) * 0.85;
+    // Two blades crossing
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.6, -s);
+    ctx.lineTo(s * 0.3, s * 0.5);
+    ctx.moveTo(s * 0.6, -s);
+    ctx.lineTo(-s * 0.3, s * 0.5);
+    ctx.stroke();
+    // Handles (small circles)
+    ctx.beginPath();
+    ctx.arc(-s * 0.3, s * 0.7, s * 0.25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(s * 0.3, s * 0.7, s * 0.25, 0, Math.PI * 2);
+    ctx.stroke();
+  },
 };
 
 // ══════════════════════════════════════════

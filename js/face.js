@@ -40,6 +40,7 @@ let scanDir = 1;
 let radioMode = false;
 let radioPlaying = false;
 let radioPulse = 0;     // mouth pulse animation
+let radioGroove = 0;    // head sway phase
 let radioAudio = null;
 // Mon petit France Inter — "c'est pas pour les grands !"
 const RADIO_URL = 'https://icecast.radiofrance.fr/monpetitfranceinter-midfi.aac';
@@ -182,9 +183,10 @@ export function update(dt, target) {
 
   breathPhase += dt * 1.2;
 
-  // Radio mouth pulse
+  // Radio groove — head sway + mouth pulse
   if (radioPlaying) {
     radioPulse += dt * 3;
+    radioGroove += dt * 1.8; // ~108 BPM feel
   }
 
   // Scan transition
@@ -214,9 +216,18 @@ export function draw() {
   const breath = Math.sin(breathPhase) * 2 * scale;
   const skX = face.face.skewX || 0;
   const skY = face.face.skewY || 0;
+
+  // Radio groove: head sways left-right, bobs up-down at double freq
+  const grooveX = radioPlaying ? Math.sin(radioGroove) * 8 * scale : 0;
+  const grooveY = radioPlaying ? Math.sin(radioGroove * 2) * 3 * scale : 0;
+  const grooveTilt = radioPlaying ? Math.sin(radioGroove) * 6 : 0; // degrees
+
   ctx.save();
-  ctx.translate(cx + face.face.x * scale, cy + face.face.y * scale + breath);
-  ctx.rotate(face.face.tilt * Math.PI / 180);
+  ctx.translate(
+    cx + face.face.x * scale + grooveX,
+    cy + face.face.y * scale + breath + grooveY
+  );
+  ctx.rotate((face.face.tilt + grooveTilt) * Math.PI / 180);
   const sx = face.face.scale * (1 - face.face.squash * 0.15);
   const sy = face.face.scale * (1 + face.face.squash * 0.15);
   ctx.scale(sx, sy);

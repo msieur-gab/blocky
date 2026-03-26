@@ -26,10 +26,14 @@ const REACTIONS = {
     { expr: 'sleepy',    duration: 800, sound: 'hum_sad' },
   ],
 
-  sleep: [
-    { expr: 'yawn',      duration: 1000, sound: 'yawn_sound' },
-    { expr: 'sleepy',    duration: 1200, sound: 'snore_cycle' },
-  ],
+  sleep: {
+    loop: true,
+    frames: [
+      { expr: 'yawn',      duration: 1500, sound: 'yawn_sound' },
+      { expr: 'sleepy',    duration: 3200, sound: 'snore_cycle' },
+      { expr: 'sleepy',    duration: 3200, sound: 'snore_cycle' },
+    ],
+  },
 
   game_start: [
     { expr: 'surprise',  duration: 200, sound: 'powerup' },
@@ -51,9 +55,9 @@ const REACTIONS = {
   ],
 
   love: [
-    { expr: 'surprise',  duration: 200, sound: 'chirp_up' },
-    { expr: 'love',      duration: 800, sound: 'hum_happy' },
-    { expr: 'happy',     duration: 500 },
+    { expr: 'surprise',  duration: 300, sound: 'chirp_up' },
+    { expr: 'love',      duration: 2400, sound: 'hum_happy' },
+    { expr: 'happy',     duration: 800 },
   ],
 
   child_laughed: [
@@ -113,15 +117,21 @@ const REACTIONS = {
   ],
 
   game_win: [
-    { expr: 'excited',   duration: 300, sound: 'fanfare' },
-    { expr: 'happy',     duration: 500, sound: 'laugh' },
-    { expr: 'silly',     duration: 400, sound: 'babble_excited' },
+    { expr: 'surprise',  duration: 200, sound: 'fanfare' },
+    { expr: 'starry',    duration: 400, sound: 'win' },
+    { expr: 'starry',    duration: 300, tilt: 15 },
+    { expr: 'starry',    duration: 300, tilt: -15 },
+    { expr: 'starry',    duration: 300, tilt: 12 },
+    { expr: 'starry',    duration: 300, tilt: -12, sound: 'laugh_big' },
+    { expr: 'happy',     duration: 500, sound: 'babble_excited' },
   ],
 
   game_lose: [
-    { expr: 'shocked',   duration: 200, sound: 'chirp_down' },
-    { expr: 'sad',       duration: 400, sound: 'whimper' },
-    { expr: 'determined',duration: 500, sound: 'grumble' },
+    { expr: 'shocked',    duration: 300, sound: 'squeak' },
+    { expr: 'dizzy',      duration: 400, tilt: 8, sound: 'warble' },
+    { expr: 'sad',        duration: 500, sound: 'whimper' },
+    { expr: 'determined', duration: 600, sound: 'grumble' },
+    { expr: 'excited',    duration: 400, sound: 'babble_fast' },
   ],
 
   thinking: [
@@ -141,12 +151,100 @@ const REACTIONS = {
     { expr: 'silly',      duration: 400, sound: 'giggle' },
   ],
 
+  // ── Agreement / Disagreement ──
+
+  // Slight nod — "mhm"
+  agree: [
+    { expr: 'calm',    duration: 200, y: -3 },
+    { expr: 'calm',    duration: 200, y: 4, sound: 'chirp_short' },
+    { expr: 'calm',    duration: 200, y: -2 },
+    { expr: 'calm',    duration: 200, y: 3 },
+    { expr: 'calm',    duration: 300 },
+  ],
+
+  // Enthusiastic nod — "YES!"
+  agree_strong: [
+    { expr: 'happy',   duration: 150, y: -5, sound: 'chirp_up' },
+    { expr: 'happy',   duration: 150, y: 6 },
+    { expr: 'happy',   duration: 150, y: -5 },
+    { expr: 'happy',   duration: 150, y: 6, sound: 'chirp_up' },
+    { expr: 'happy',   duration: 150, y: -4 },
+    { expr: 'happy',   duration: 150, y: 5 },
+    { expr: 'excited', duration: 150, y: -3 },
+    { expr: 'excited', duration: 150, y: 4, sound: 'babble_excited' },
+    { expr: 'happy',   duration: 400 },
+  ],
+
+  // Slight head shake — "nah"
+  disagree: [
+    { expr: 'calm',    duration: 180, skewX: 0.4 },
+    { expr: 'calm',    duration: 180, skewX: -0.4, sound: 'hum' },
+    { expr: 'calm',    duration: 180, skewX: 0.3 },
+    { expr: 'calm',    duration: 180, skewX: -0.3 },
+    { expr: 'calm',    duration: 300 },
+  ],
+
+  // Strong head shake — "NO!"
+  disagree_strong: [
+    { expr: 'angry',   duration: 130, skewX: 0.7, sound: 'grumble' },
+    { expr: 'angry',   duration: 130, skewX: -0.7 },
+    { expr: 'angry',   duration: 130, skewX: 0.6 },
+    { expr: 'angry',   duration: 130, skewX: -0.6 },
+    { expr: 'angry',   duration: 130, skewX: 0.5 },
+    { expr: 'angry',   duration: 130, skewX: -0.5, sound: 'grumble' },
+    { expr: 'determined', duration: 400 },
+  ],
+
+  // Hesitant — "ehh... I guess"
+  agree_hesitant: [
+    { expr: 'thinking', duration: 600, sound: 'hum', tilt: 5 },
+    { expr: 'calm',     duration: 200, y: -2 },
+    { expr: 'calm',     duration: 200, y: 3 },
+    { expr: 'calm',     duration: 300, sound: 'chirp_short' },
+  ],
+
   // ── Music ──
 
   music: [
     { expr: 'surprise',  duration: 200, sound: 'chirp_up' },
     { expr: 'musical',   duration: 600, sound: 'twinkle' },
     { expr: 'radio',     duration: 800, sound: 'hum_happy' },
+  ],
+
+  // ── Game ──
+
+  game_tie: [
+    { expr: 'thinking',   duration: 400, sound: 'hum' },
+    { expr: 'determined', duration: 500, sound: 'babble_fast' },
+  ],
+
+  // Kid wins the whole game — Blocky is grumpy, then celebrates the kid
+  game_over_player: [
+    { expr: 'shocked',    duration: 400, sound: 'squeak' },
+    { expr: 'angry',      duration: 600, sound: 'grumble' },
+    { expr: 'annoyed',    duration: 500, tilt: -5 },
+    { expr: 'sad',        duration: 600, sound: 'whimper' },
+    { expr: 'surprise',   duration: 300, sound: 'powerup' },
+    { expr: 'starry',     duration: 400, sound: 'fanfare', tilt: 12 },
+    { expr: 'starry',     duration: 300, tilt: -12 },
+    { expr: 'starry',     duration: 300, tilt: 15, sound: 'win' },
+    { expr: 'starry',     duration: 300, tilt: -15 },
+    { expr: 'starry',     duration: 300, tilt: 10 },
+    { expr: 'happy',      duration: 600, sound: 'laugh_big' },
+  ],
+
+  // Blocky wins the whole game — full celebration
+  game_over_blocky: [
+    { expr: 'surprise',   duration: 200, sound: 'powerup' },
+    { expr: 'starry',     duration: 500, sound: 'fanfare' },
+    { expr: 'starry',     duration: 300, tilt: 20, sound: 'win' },
+    { expr: 'starry',     duration: 300, tilt: -20 },
+    { expr: 'starry',     duration: 300, tilt: 15 },
+    { expr: 'starry',     duration: 300, tilt: -15, sound: 'laugh_big' },
+    { expr: 'starry',     duration: 300, tilt: 10 },
+    { expr: 'starry',     duration: 300, tilt: -10 },
+    { expr: 'excited',    duration: 500, sound: 'babble_excited' },
+    { expr: 'happy',      duration: 600 },
   ],
 
   // ── Face-triggered ──
@@ -169,8 +267,8 @@ const REACTIONS = {
   ],
 };
 
-// ── Idle behaviors ──
-// Triggered by timers when no interaction is happening
+// ── Idle behaviors (legacy — replaced by personality.js) ──
+// Kept as fallback, personality.js registers its own richer behaviors
 
 const IDLES = [
   {
@@ -215,37 +313,95 @@ const IDLES = [
 // ── Sequencer state ──
 
 let currentSequence = null;
+let currentLoop = false;       // does current sequence loop?
 let sequenceIndex = 0;
 let sequenceTimer = 0;
 let currentTarget = resolve('calm');
 let holdExpression = null;     // mood-based default to return to
+let gameOverride = null;       // game directly sets expression, bypasses mood
 let idleTimers = [];
 let idlePaused = false;
 
 // ── Public API ──
 
 export function init() {
-  scheduleIdles();
+  // Don't schedule old idles — personality.js handles this now
+  // scheduleIdles();
   bus.on('reaction:trigger', trigger);
+
+  // Allow other modules to register new reactions dynamically
+  bus.on('reactions:register', (newReactions) => {
+    Object.assign(REACTIONS, newReactions);
+    console.log(`[reactions] Registered ${Object.keys(newReactions).length} new reactions`);
+  });
+
+  // Game expression override — bypasses mood and idle (by preset name)
+  bus.on('expression:override', (exprName) => {
+    if (exprName) {
+      gameOverride = resolve(exprName);
+      currentTarget = gameOverride;
+      currentSequence = null;
+      idlePaused = true;
+    } else {
+      gameOverride = null;
+      idlePaused = false;
+    }
+  });
+
+  // Raw expression override — bypasses mood with a full expression object (for time, etc.)
+  bus.on('expression:raw', (exprObj) => {
+    if (exprObj) {
+      gameOverride = exprObj;
+      currentTarget = exprObj;
+      currentSequence = null;
+      idlePaused = true;
+    } else {
+      gameOverride = null;
+      idlePaused = false;
+    }
+  });
 }
 
 export function trigger(name) {
-  const seq = REACTIONS[name];
-  if (!seq) return;
+  const raw = REACTIONS[name];
+  if (!raw) return;
+
+  // Support both array format and { loop, frames } format
+  const seq = Array.isArray(raw) ? raw : raw.frames;
+  currentLoop = Array.isArray(raw) ? false : !!raw.loop;
+
+  if (!seq || seq.length === 0) return;
 
   currentSequence = seq;
   sequenceIndex = 0;
   sequenceTimer = 0;
-  currentTarget = resolve(seq[0].expr);
+  currentTarget = applyKeyframe(seq[0]);
   idlePaused = true;
 
-  // Play sound for first keyframe
   if (seq[0].sound) playSound(seq[0].sound);
-
   bus.emit('reaction:started', name);
 }
 
+// Resolve expression + apply keyframe overrides (tilt, scale, x, y, skewX...)
+function applyKeyframe(frame) {
+  const resolved = resolve(frame.expr);
+  const overrides = {};
+  if (frame.tilt !== undefined) overrides.tilt = frame.tilt;
+  if (frame.scale !== undefined) overrides.scale = frame.scale;
+  if (frame.x !== undefined) overrides.x = frame.x;
+  if (frame.y !== undefined) overrides.y = frame.y;
+  if (frame.skewX !== undefined) overrides.skewX = frame.skewX;
+
+  if (Object.keys(overrides).length > 0) {
+    return { ...resolved, face: { ...resolved.face, ...overrides } };
+  }
+  return resolved;
+}
+
 export function setMoodExpression(moodName) {
+  // Game override takes priority
+  if (gameOverride) return;
+
   // Radio mode: lock the hold expression to 'radio' face
   holdExpression = isRadioPlaying() ? resolve('radio') : resolve(moodName);
   // Only apply if no reaction is playing
@@ -269,8 +425,18 @@ export function update(dt) {
     sequenceIndex++;
 
     if (sequenceIndex >= currentSequence.length) {
+      if (currentLoop) {
+        // Loop: restart from beginning
+        sequenceIndex = 0;
+        const first = currentSequence[0];
+        currentTarget = applyKeyframe(first);
+        if (first.sound) playSound(first.sound);
+        return;
+      }
+
       // Sequence done — return to mood hold
       currentSequence = null;
+      currentLoop = false;
       sequenceIndex = 0;
       idlePaused = false;
 
@@ -281,7 +447,7 @@ export function update(dt) {
       bus.emit('reaction:ended');
     } else {
       const nextFrame = currentSequence[sequenceIndex];
-      currentTarget = resolve(nextFrame.expr);
+      currentTarget = applyKeyframe(nextFrame);
       if (nextFrame.sound) playSound(nextFrame.sound);
     }
   }
