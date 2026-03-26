@@ -543,12 +543,17 @@ function renderControls() {
 // ══════════════════════════════════════════
 
 function exportJSON() {
-  const out = keyframes.map(kf => {
+  const out = keyframes.map((kf, i) => {
+    const prev = i === 0 ? D : keyframes[i - 1].state;
     const diff = {};
     Object.keys(kf.state).forEach(k => {
-      if (kf.state[k] !== D[k]) diff[k] = Math.round(kf.state[k] * 100) / 100;
+      const val = Math.round(kf.state[k] * 100) / 100;
+      const prevVal = Math.round((prev[k] || 0) * 100) / 100;
+      if (val !== prevVal) diff[k] = val;
     });
-    return { eyes: diff, duration: kf.duration, ease: kf.ease };
+    const entry = { eyes: diff, duration: kf.duration };
+    if (kf.ease !== 'smoothStep') entry.ease = kf.ease;
+    return entry;
   });
   const json = JSON.stringify(out, null, 2);
   navigator.clipboard.writeText(json).then(() => {
