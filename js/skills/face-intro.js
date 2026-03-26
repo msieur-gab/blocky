@@ -44,10 +44,11 @@ export default {
   handleIntent(intent, entities) {
     if (intent !== 'introduction' || !entities?.name) return false;
 
-    // Delegate to faces service — it handles camera + enrollment
-    // The faces service already listens for intent:introduction via bus
     console.log(`[face-intro] Introduction: ${entities.name}`);
 
-    return true; // handled — faces.js does the rest via bus
+    // Return to presence immediately — faces.js handles the rest via bus
+    ctx?.done();
+
+    return true;
   },
 };

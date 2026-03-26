@@ -45,10 +45,11 @@ export default {
     }, 2200);
     setTimeout(() => ctx.voice.play('countdown_beep'), 2500);
 
-    // Phase 3: release
+    // Phase 3: release and return to presence
     setTimeout(() => {
       ctx.face.release();
       ctx.voice.play('chirp_down');
+      ctx.done();
     }, 4200);
 
     ctx.memory.log({ category: 'interaction', data: { time: `${h}:${String(m).padStart(2, '0')}` } });

@@ -32,22 +32,16 @@ export default {
     ],
   },
 
-  reactions: {
-    // Inherits love, child_laughed, etc. from presence reactions
-  },
-
   activate(context) {
     ctx = context;
     ctx.face.startScan();
     gestures.start();
 
-    // Listen for gestures
     gestureUnsub = ctx.bus.onGlobal('gesture:detected', onGesture);
 
-    // Auto-stop after 10s
     timeoutId = setTimeout(() => {
       console.log('[look] Timeout — no gesture');
-      cleanup();
+      finish();
     }, 10000);
 
     console.log('[look] Scanning for gestures...');
@@ -59,7 +53,7 @@ export default {
 
   handleIntent(intent) {
     if (intent === 'stop') {
-      cleanup();
+      finish();
       return true;
     }
     return false;
@@ -72,18 +66,29 @@ function onGesture({ gesture }) {
   const mapping = GESTURE_REACTIONS[gesture];
   if (mapping) {
     console.log(`[look] Gesture: ${gesture}`);
+    ctx.face.stopScan();
     ctx.face.mood(mapping.mood);
     ctx.face.react(mapping.reaction);
     ctx.memory.log({ category: 'gesture', data: { gesture } });
 
-    setTimeout(() => cleanup(), 500);
+    // Wait for reaction to play, then finish
+    setTimeout(() => finish(), 500);
   }
+}
+
+function finish() {
+  const done = ctx?.done;
+  cleanup();
+  if (done) done(); // tell kernel we're done → returns to presence
 }
 
 function cleanup() {
   if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
   if (gestureUnsub) { gestureUnsub(); gestureUnsub = null; }
-  ctx?.face.stopScan();
+  if (ctx) {
+    ctx.face.stopScan();
+    ctx.face.release();
+  }
   gestures.stop();
   ctx = null;
 }

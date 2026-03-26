@@ -57,10 +57,17 @@ function makeContext(skill) {
     bus: {
       emit: (event, data) => bus.emit(`${skill.id}:${event}`, data),
       on:   (event, fn) => bus.on(`${skill.id}:${event}`, fn),
-      // Also allow listening to global events (read-only)
       onGlobal: (event, fn) => bus.on(event, fn),
     },
     state, // read-only reference to kernel state
+
+    // Signal the kernel this skill is done — returns to presence
+    done: () => {
+      if (activeSkill === skill) {
+        activeSkill = null;
+        console.log(`[kernel] Skill done: ${skill.id}`);
+      }
+    },
   };
 }
 
