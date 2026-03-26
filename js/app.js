@@ -24,6 +24,7 @@ import rpsSkill, { state as rpsState, getPhase as rpsGetPhase } from './skills/r
 import timeSkill from './skills/time.js';
 import lookSkill from './skills/look.js';
 import faceIntroSkill from './skills/face-intro.js';
+import magic8Skill from './skills/magic8.js';
 // rps state imported above with rpsSkill
 
 // ── DOM ──
@@ -291,6 +292,7 @@ startGate.addEventListener('click', async () => {
   kernel.register(timeSkill);
   kernel.register(lookSkill);
   kernel.register(faceIntroSkill);
+  kernel.register(magic8Skill);
 
   // Activate presence as default (starts personality idle)
   presenceSkill.activate({
