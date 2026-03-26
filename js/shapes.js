@@ -21,6 +21,25 @@ function roundRect(ctx, w, h, r) {
   ctx.closePath();
 }
 
+// 4-corner variant: independent radius per corner (tl, tr, br, bl)
+function roundRect4(ctx, w, h, tl, tr, br, bl) {
+  tl = Math.min(tl, w, h);
+  tr = Math.min(tr, w, h);
+  br = Math.min(br, w, h);
+  bl = Math.min(bl, w, h);
+  ctx.beginPath();
+  ctx.moveTo(-w + tl, -h);
+  ctx.lineTo(w - tr, -h);
+  ctx.quadraticCurveTo(w, -h, w, -h + tr);
+  ctx.lineTo(w, h - br);
+  ctx.quadraticCurveTo(w, h, w - br, h);
+  ctx.lineTo(-w + bl, h);
+  ctx.quadraticCurveTo(-w, h, -w, h - bl);
+  ctx.lineTo(-w, -h + tl);
+  ctx.quadraticCurveTo(-w, -h, -w + tl, -h);
+  ctx.closePath();
+}
+
 // ══════════════════════════════════════════
 // EYE SHAPES
 // All draw centered at (0, 0)
@@ -29,9 +48,32 @@ function roundRect(ctx, w, h, r) {
 
 export const eyes = {
 
-  // Pill / rounded rectangle (default)
+  // Pill / rounded rectangle (default) — all corners equal
   pill(ctx, w, h, r) {
     roundRect(ctx, w, h, Math.min(r, w, h));
+    ctx.fill();
+  },
+
+  // Droopy — rounded top, flatter bottom (sad, sleepy, falling asleep)
+  droopy(ctx, w, h, r) {
+    const top = Math.min(r, w, h);
+    const bot = Math.min(r * 0.5, w, h);
+    roundRect4(ctx, w, h, top, top, bot, bot);
+    ctx.fill();
+  },
+
+  // Sharp — flat top, rounded bottom (angry, determined, suspicious)
+  sharp(ctx, w, h, r) {
+    const top = Math.min(r * 0.5, w, h);
+    const bot = Math.min(r, w, h);
+    roundRect4(ctx, w, h, top, top, bot, bot);
+    ctx.fill();
+  },
+
+  // Soft — all corners reduced (worried, small, cautious)
+  soft(ctx, w, h, r) {
+    const s = Math.min(r * 0.5, w, h);
+    roundRect4(ctx, w, h, s, s, s, s);
     ctx.fill();
   },
 
