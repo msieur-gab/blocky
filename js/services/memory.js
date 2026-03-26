@@ -227,12 +227,9 @@ export async function wipe(category) {
   bus.emit('memory:wiped', { category });
 }
 
-// ══════════════════════════════════════════
-// Compatibility — old storage.js API
-// Allows gradual migration during refactor
-// ══════════════════════════════════════════
+// ── Compatibility aliases (old storage.js API) ──
 
-export { getFaces, getFace, putFace, deleteFace };
-export { getConfig as getPref, setConfig as setPref };
-export { wipe as clear };
+export const getPref = getConfig;
+export const setPref = setConfig;
+export const clear = wipe;
 export function isReady() { return ready; }
