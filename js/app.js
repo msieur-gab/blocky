@@ -148,25 +148,33 @@ function broadcastState() {
   const ss = sensors.state;
 
   devChannel.postMessage({ type: 'state', data: {
+    // Kernel
     mood: cs.mood,
-    mode: cs.mode,
+    activeSkill: kernel.getActiveSkill(),
+    lastIntent: cs.lastIntent,
     energy: cs.energy.toFixed(2),
     attention: cs.attention.toFixed(2),
     silence: cs.silenceDuration.toFixed(1) + 's',
-    lastIntent: cs.lastIntent,
-    currentFace: cs.currentFace ? cs.currentFace.name : null,
+    interactionCount: cs.interactionCount,
+    // Ears
+    earsStage: ears.getStage(),
+    creatureName: ears.getCreatureName() || 'none',
+    // Models
     nluReady: nlu.isReady(),
     faceModelsReady: faces.isModelReady(),
+    // Camera
     scanning: faces.isScanning(),
     cameraActive: camera.isActive(),
+    // Identity
+    currentFace: cs.currentFace ? cs.currentFace.name : null,
+    knownFaces: faces.getKnownFaces(),
+    // Sensors
     tiltX: ss.tiltX.toFixed(2),
     tiltY: ss.tiltY.toFixed(2),
     shake: ss.shake.toFixed(2),
     rotating: ss.rotating ? 'yes' : 'no',
     faceDown: ss.faceDown ? 'yes' : 'no',
-    earsStage: ears.getStage(),
-    creatureName: ears.getCreatureName() || 'unnamed',
-    knownFaces: faces.getKnownFaces(),
+    // Game
     gamePhase: rpsGetPhase(),
     gameRound: rpsState.round,
     gameScore: rpsState.score,

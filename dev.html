@@ -3,17 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blocky — Dev Console</title>
+<title>ami.b — Dev Console</title>
 <style>
 :root {
-  --bg: #111;
-  --surface: #1a1a1a;
+  --bg: #0e0e12;
+  --surface: #16161d;
+  --surface2: #1e1e28;
   --text: #d0d0d0;
-  --muted: #666;
+  --muted: #555;
   --accent: #5b9bf6;
   --green: #4ade80;
   --yellow: #fbbf24;
   --red: #f87171;
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,272 +24,287 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.6 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-  padding: 16px;
+  font: 12px/1.5 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  padding: 12px;
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
-  margin-bottom: 16px;
+/* Header */
+header {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
-h1 .dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--red);
-  transition: background 0.3s;
-}
+header h1 { font-size: 13px; font-weight: 600; color: var(--accent); }
+header .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: background 0.3s; }
+header .dot.on { background: var(--green); }
+header .tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--surface2); color: var(--muted); }
+header .tag.active { background: var(--accent); color: #000; }
 
-h1 .dot.connected { background: var(--green); }
-
+/* Grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-section {
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 12px;
-}
-
-section h2 {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.row {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 0;
+/* Cards */
+.card {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--surface2);
 }
 
+.card.highlight { border-left-color: var(--accent); }
+.card.warn { border-left-color: var(--yellow); }
+.card.ok { border-left-color: var(--green); }
+
+.card h2 {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.row { display: flex; justify-content: space-between; padding: 1px 0; }
 .label { color: var(--muted); }
-.value { color: var(--text); text-align: right; }
-.value.ready { color: var(--green); }
-.value.loading { color: var(--yellow); }
+.val { text-align: right; }
+.val.on { color: var(--green); }
+.val.off { color: var(--muted); }
+.val.warn { color: var(--yellow); }
+.val.hot { color: var(--red); }
+.val.skill { color: var(--purple); }
+.val.intent { color: var(--cyan); }
+
+/* Transcript */
+#transcript-card {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--cyan);
+}
 
 #transcript {
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 12px;
-  min-height: 60px;
-  max-height: 120px;
+  min-height: 32px;
+  max-height: 80px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  color: var(--muted);
+  color: var(--text);
   font-style: italic;
 }
 
-#log {
+/* Camera + Gesture */
+#camera-section {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+#cam-preview {
+  width: 180px;
+  height: 135px;
+  border-radius: 6px;
+  background: #000;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+#gesture-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.75);
+  color: var(--green);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  display: none;
+}
+
+/* Log */
+#log-card {
   background: var(--surface);
-  border-radius: 8px;
-  padding: 12px;
-  max-height: 300px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--yellow);
+}
+
+#log {
+  max-height: 260px;
   overflow-y: auto;
 }
 
 .log-entry {
-  padding: 2px 0;
-  border-bottom: 1px solid #222;
-  font-size: 12px;
+  padding: 1px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #1a1a22;
 }
 
-.log-entry .time { color: var(--muted); margin-right: 8px; }
-.log-entry.intent { color: var(--accent); }
+.log-entry .t { color: var(--muted); margin-right: 6px; font-size: 10px; }
+.log-entry.intent { color: var(--cyan); }
 .log-entry.face { color: var(--green); }
 .log-entry.reaction { color: var(--yellow); }
-
-.waiting {
-  color: var(--muted);
-  text-align: center;
-  padding: 40px;
-  font-style: italic;
-}
 </style>
 </head>
 <body>
 
-<h1>
-  <span class="dot" id="status-dot"></span>
-  Blocky Dev Console
-</h1>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>ami.b</h1>
+  <span class="tag" id="tag-skill">presence</span>
+  <span class="tag" id="tag-ears">ears: —</span>
+  <span class="tag" id="tag-mood">mood: calm</span>
+</header>
 
 <div class="grid">
 
-  <!-- Companion State -->
-  <section>
-    <h2>Companion</h2>
-    <div id="companion-state"><div class="waiting">waiting for connection...</div></div>
-  </section>
+  <!-- Kernel -->
+  <div class="card highlight">
+    <h2>Kernel</h2>
+    <div id="s-kernel"></div>
+  </div>
+
+  <!-- Ears -->
+  <div class="card">
+    <h2>Ears</h2>
+    <div id="s-ears"></div>
+  </div>
 
   <!-- Models -->
-  <section>
+  <div class="card">
     <h2>Models</h2>
-    <div id="models-state"><div class="waiting">—</div></div>
-  </section>
+    <div id="s-models"></div>
+  </div>
+
+  <!-- Identity -->
+  <div class="card">
+    <h2>Identity</h2>
+    <div id="s-identity"></div>
+  </div>
 
   <!-- Sensors -->
-  <section>
+  <div class="card">
     <h2>Sensors</h2>
-    <div id="sensor-state"><div class="waiting">—</div></div>
-  </section>
-
-  <!-- Known Faces -->
-  <section>
-    <h2>Known Faces</h2>
-    <div id="faces-state"><div class="waiting">—</div></div>
-  </section>
+    <div id="s-sensors"></div>
+  </div>
 
   <!-- Game -->
-  <section>
+  <div class="card">
     <h2>Game</h2>
-    <div id="game-state"><div class="waiting">—</div></div>
-  </section>
+    <div id="s-game"></div>
+  </div>
 
 </div>
 
-<br>
+<!-- Transcript -->
+<div id="transcript-card">
+  <h2 style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:4px;">Transcript</h2>
+  <div id="transcript">waiting for speech...</div>
+</div>
 
 <!-- Camera + Gesture -->
-<section>
-  <h2>Camera / Gesture</h2>
-  <div style="display:flex; gap:12px; align-items:center;">
-    <div style="position:relative;">
-      <video id="cam-preview" autoplay playsinline muted
-        style="width:200px; height:150px; border-radius:6px; background:#000; object-fit:cover; transform:scaleX(-1);"></video>
-      <div id="gesture-badge" style="position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
-        background:rgba(0,0,0,0.7); color:#fff; padding:2px 10px; border-radius:12px; font-size:13px; font-weight:600; display:none;"></div>
-    </div>
-    <div id="gesture-info" style="flex:1;">
-      <div class="row"><span class="label">detected</span><span class="value" id="gesture-name">—</span></div>
-      <div class="row"><span class="label">confidence</span><span class="value" id="gesture-conf">—</span></div>
-      <div class="row"><span class="label">raw</span><span class="value" id="gesture-raw">—</span></div>
+<div id="camera-section">
+  <div style="position:relative;">
+    <video id="cam-preview" autoplay playsinline muted></video>
+    <div id="gesture-badge"></div>
+  </div>
+  <div class="card" style="flex:1;">
+    <h2>Gesture</h2>
+    <div id="s-gesture">
+      <div class="row"><span class="label">detected</span><span class="val" id="g-name">—</span></div>
+      <div class="row"><span class="label">confidence</span><span class="val" id="g-conf">—</span></div>
+      <div class="row"><span class="label">raw</span><span class="val" id="g-raw">—</span></div>
     </div>
   </div>
-</section>
-
-<br>
-
-<!-- Transcript -->
-<section>
-  <h2>Transcript</h2>
-  <div id="transcript">waiting for speech...</div>
-</section>
-
-<br>
+</div>
 
 <!-- Event Log -->
-<section>
-  <h2>Event Log</h2>
+<div id="log-card">
+  <h2 style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:4px;">Event Log</h2>
   <div id="log"></div>
-</section>
+</div>
 
 <script>
-const channel = new BroadcastChannel('blocky-dev');
-const dot = document.getElementById('status-dot');
+const ch = new BroadcastChannel('blocky-dev');
+const dot = document.getElementById('dot');
+const tagSkill = document.getElementById('tag-skill');
+const tagEars = document.getElementById('tag-ears');
+const tagMood = document.getElementById('tag-mood');
 let lastPing = 0;
+let camStream = null;
+let gestureBadgeTimer = null;
 
-const gestureBadge = document.getElementById('gesture-badge');
-const gestureName = document.getElementById('gesture-name');
-const gestureConf = document.getElementById('gesture-conf');
-const gestureRaw = document.getElementById('gesture-raw');
-
-channel.onmessage = (e) => {
+ch.onmessage = (e) => {
   const { type, data } = e.data;
   lastPing = Date.now();
-  dot.classList.add('connected');
+  dot.classList.add('on');
 
   switch (type) {
     case 'state': renderState(data); break;
-    case 'log':
-      appendLog(data);
-      // Update gesture display from log events
-      if (data.msg && data.msg.startsWith('hand:')) {
-        const m = data.msg.match(/hand: (\w+) \((\d+)%\) \[(\w+)\]/);
-        if (m) {
-          gestureName.textContent = m[1];
-          gestureConf.textContent = m[2] + '%';
-          gestureRaw.textContent = m[3];
-          gestureBadge.textContent = m[1].toUpperCase();
-          gestureBadge.style.display = 'block';
-          clearTimeout(gestureBadgeTimer);
-          gestureBadgeTimer = setTimeout(() => { gestureBadge.style.display = 'none'; }, 2000);
-        }
-      }
-      if (data.msg && data.msg.startsWith('raw gesture:')) {
-        const m = data.msg.match(/raw gesture: (\w+) \((\d+)%\)/);
-        if (m) {
-          gestureRaw.textContent = m[1] + ' (' + m[2] + '%)';
-        }
-      }
-      break;
     case 'transcript': renderTranscript(data); break;
+    case 'log': appendLog(data); parseLogForGesture(data); break;
   }
 };
 
-// Connection watchdog
 setInterval(() => {
-  if (Date.now() - lastPing > 3000) {
-    dot.classList.remove('connected');
-  }
+  if (Date.now() - lastPing > 3000) dot.classList.remove('on');
 }, 1000);
 
-// Camera preview — mirrors the main tab's camera via its own getUserMedia
-let camStream = null;
-
-function updateCamPreview(cameraActive) {
-  const video = document.getElementById('cam-preview');
-  if (cameraActive && !camStream) {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 }, audio: false })
-      .then(stream => {
-        camStream = stream;
-        video.srcObject = stream;
-      })
-      .catch(() => {});
-  } else if (!cameraActive && camStream) {
-    camStream.getTracks().forEach(t => t.stop());
-    camStream = null;
-    video.srcObject = null;
-  }
-}
-
-let gestureBadgeTimer = null;
+// ── Render ──
 
 function renderState(s) {
-  // Companion
-  document.getElementById('companion-state').innerHTML = rows([
+  // Header tags
+  tagSkill.textContent = s.activeSkill || 'presence';
+  tagSkill.classList.toggle('active', s.activeSkill && s.activeSkill !== 'presence');
+  tagEars.textContent = `ears: ${s.earsStage || '—'}`;
+  tagMood.textContent = `mood: ${s.mood}`;
+
+  // Kernel
+  el('s-kernel').innerHTML = rows([
     ['mood', s.mood],
-    ['mode', s.mode],
-    ['energy', s.energy],
+    ['skill', s.activeSkill || 'presence', 'skill'],
+    ['intent', s.lastIntent || '—', 'intent'],
     ['attention', s.attention],
+    ['energy', s.energy],
     ['silence', s.silence],
-    ['intent', s.lastIntent || '—'],
-    ['face', s.currentFace || '—'],
+    ['interactions', s.interactionCount || 0],
+  ]);
+
+  // Ears
+  el('s-ears').innerHTML = rows([
+    ['stage', s.earsStage || '—', s.earsStage === 'active' ? 'on' : 'off'],
+    ['creature name', s.creatureName || 'none'],
   ]);
 
   // Models
-  document.getElementById('models-state').innerHTML = rows([
-    ['nlu', s.nluReady ? 'ready' : 'loading...', s.nluReady],
-    ['face detect', s.faceModelsReady ? 'ready' : 'not loaded', s.faceModelsReady],
-    ['scanning', s.scanning ? 'active' : 'idle'],
-    ['camera', s.cameraActive ? 'active' : 'off'],
+  el('s-models').innerHTML = rows([
+    ['nlu', s.nluReady ? 'ready' : 'loading...', s.nluReady ? 'on' : 'warn'],
+    ['face detect', s.faceModelsReady ? 'ready' : 'not loaded', s.faceModelsReady ? 'on' : 'off'],
+    ['scanning', s.scanning ? 'active' : 'idle', s.scanning ? 'warn' : 'off'],
+    ['camera', s.cameraActive ? 'active' : 'off', s.cameraActive ? 'on' : 'off'],
   ]);
 
+  // Identity
+  const facesHtml = (s.knownFaces && s.knownFaces.length > 0)
+    ? s.knownFaces.map(f => row(f.name, `${f.role} (${f.seeCount}x)`)).join('')
+    : row('none enrolled', '—', 'off');
+  el('s-identity').innerHTML = rows([
+    ['current', s.currentFace || '—', s.currentFace ? 'on' : 'off'],
+  ]) + facesHtml;
+
   // Sensors
-  document.getElementById('sensor-state').innerHTML = rows([
+  el('s-sensors').innerHTML = rows([
     ['tilt X', s.tiltX],
     ['tilt Y', s.tiltY],
     ['shake', s.shake],
@@ -294,50 +312,74 @@ function renderState(s) {
     ['face down', s.faceDown],
   ]);
 
-  // Faces
-  const facesEl = document.getElementById('faces-state');
-  if (s.knownFaces && s.knownFaces.length > 0) {
-    facesEl.innerHTML = s.knownFaces.map(f =>
-      `<div class="row"><span class="label">${f.name}</span><span class="value">${f.role} (${f.seeCount}x)</span></div>`
-    ).join('');
-  } else {
-    facesEl.innerHTML = '<div class="row"><span class="label">none enrolled</span></div>';
-  }
-
   // Game
-  const gameEl = document.getElementById('game-state');
   if (s.gamePhase && s.gamePhase !== 'idle') {
-    gameEl.innerHTML = rows([
-      ['phase', s.gamePhase],
+    el('s-game').innerHTML = rows([
+      ['phase', s.gamePhase, 'warn'],
       ['round', s.gameRound || '—'],
       ['score', s.gameScore ? `${s.gameScore.player} : ${s.gameScore.blocky}` : '—'],
     ]);
   } else {
-    gameEl.innerHTML = '<div class="row"><span class="label">not active</span></div>';
+    el('s-game').innerHTML = row('status', 'idle', 'off');
   }
 
   // Camera preview
-  updateCamPreview(s.cameraActive);
-}
-
-function rows(data) {
-  return data.map(([k, v, isReady]) => {
-    const cls = isReady === true ? ' ready' : isReady === false ? ' loading' : '';
-    return `<div class="row"><span class="label">${k}</span><span class="value${cls}">${v}</span></div>`;
-  }).join('');
+  updateCam(s.cameraActive);
 }
 
 function renderTranscript(text) {
-  document.getElementById('transcript').textContent = text || 'waiting for speech...';
+  el('transcript').textContent = text || 'waiting for speech...';
 }
 
 function appendLog(entry) {
-  const el = document.createElement('div');
-  el.className = `log-entry ${entry.type || ''}`;
-  el.innerHTML = `<span class="time">${entry.time}</span>${entry.msg}`;
-  const log = document.getElementById('log');
-  log.prepend(el);
-  while (log.children.length > 50) log.lastChild.remove();
+  const d = document.createElement('div');
+  d.className = `log-entry ${entry.type || ''}`;
+  d.innerHTML = `<span class="t">${entry.time}</span>${entry.msg}`;
+  const log = el('log');
+  log.prepend(d);
+  while (log.children.length > 60) log.lastChild.remove();
+}
+
+function parseLogForGesture(entry) {
+  if (!entry.msg) return;
+  const m = entry.msg.match(/hand: (\w+) \((\d+)%\) \[(\w+)\]/);
+  if (m) {
+    el('g-name').textContent = m[1];
+    el('g-conf').textContent = m[2] + '%';
+    el('g-raw').textContent = m[3];
+    const badge = document.getElementById('gesture-badge');
+    badge.textContent = m[1].toUpperCase();
+    badge.style.display = 'block';
+    clearTimeout(gestureBadgeTimer);
+    gestureBadgeTimer = setTimeout(() => badge.style.display = 'none', 2000);
+  }
+  const r = entry.msg.match(/raw gesture: (\w+) \((\d+)%\)/);
+  if (r) el('g-raw').textContent = r[1] + ' (' + r[2] + '%)';
+}
+
+// ── Helpers ──
+
+function el(id) { return document.getElementById(id); }
+
+function rows(data) {
+  return data.map(([k, v, cls]) => row(k, v, cls)).join('');
+}
+
+function row(k, v, cls) {
+  return `<div class="row"><span class="label">${k}</span><span class="val ${cls || ''}">${v}</span></div>`;
+}
+
+function updateCam(active) {
+  const video = el('cam-preview');
+  if (active && !camStream) {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 }, audio: false })
+      .then(stream => { camStream = stream; video.srcObject = stream; })
+      .catch(() => {});
+  } else if (!active && camStream) {
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+    video.srcObject = null;
+  }
 }
 </script>
 </body>
