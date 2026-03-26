@@ -37,10 +37,17 @@ export async function init() {
   creatureName = await memory.getCreatureName();
 
   if (!creatureName) {
-    // No name yet — go straight to active listening for naming ceremony
     console.log('[ears] No creature name set — entering naming mode');
     startActive();
     bus.emit('ear:naming');
+    return;
+  }
+
+  // DEV: check URL param ?wake=off to skip wake mode during development
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('wake') === 'off') {
+    console.log(`[ears] Wake mode disabled (dev) — active listening. Name: "${creatureName}"`);
+    startActive();
     return;
   }
 
@@ -60,6 +67,7 @@ function startWake() {
 
   recognition.onresult = (e) => {
     const text = e.results[0]?.[0]?.transcript?.toLowerCase() || '';
+    console.log(`[ears:wake] Heard: "${text}"`);
 
     if (creatureName && text.includes(creatureName.toLowerCase())) {
       console.log(`[ears] Wake word detected: "${creatureName}"`);
