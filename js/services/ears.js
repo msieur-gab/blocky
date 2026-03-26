@@ -69,7 +69,7 @@ function startWake() {
     const text = e.results[0]?.[0]?.transcript?.toLowerCase() || '';
     console.log(`[ears:wake] Heard: "${text}"`);
 
-    if (creatureName && text.includes(creatureName.toLowerCase())) {
+    if (matchesWakeWord(text)) {
       console.log(`[ears] Wake word detected: "${creatureName}"`);
       bus.emit('ami:wake', { name: creatureName });
       stopWake();
@@ -194,8 +194,15 @@ function startActive() {
 
 function resetActiveTimeout() {
   if (activeTimer) clearTimeout(activeTimer);
+
+  // Never timeout if wake is disabled (dev mode)
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('wake') === 'off') return;
+
+  if (!creatureName) return; // no wake word to return to
+
   activeTimer = setTimeout(() => {
-    if (stage === 'active' && creatureName) {
+    if (stage === 'active') {
       console.log('[ears] Active timeout — returning to wake mode');
       stopActive();
       startWake();
@@ -238,4 +245,82 @@ export function stop() {
 export function forceActive() {
   stopWake();
   startActive();
+}
+
+// ── Fuzzy wake word matching ──
+// Kids say "dodo" but speech recognition might hear "do do", "doodle", "du du", "doudou"
+// Match with tolerance for common speech-to-text variations
+
+function matchesWakeWord(text) {
+  if (!creatureName) return false;
+
+  const name = creatureName.toLowerCase();
+  const heard = text.toLowerCase();
+
+  // Exact match
+  if (heard.includes(name)) return true;
+
+  // Build fuzzy variants from the name
+  const variants = buildVariants(name);
+  for (const v of variants) {
+    if (heard.includes(v)) return true;
+  }
+
+  // Check each word in heard text against name with edit distance
+  const words = heard.split(/\s+/);
+  for (const word of words) {
+    if (editDistance(word, name) <= Math.max(1, Math.floor(name.length / 3))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function buildVariants(name) {
+  const variants = new Set();
+
+  // With spaces: "dodo" → "do do"
+  for (let i = 1; i < name.length; i++) {
+    variants.add(name.slice(0, i) + ' ' + name.slice(i));
+  }
+
+  // Doubled vowels: "dodo" → "doodo", "dodoo"
+  // Repeated syllables: "dodo" → "doudou", "dudu"
+  const vowelSwaps = { 'o': ['ou', 'oo', 'u'], 'u': ['ou', 'oo', 'o'], 'a': ['ah', 'aa'], 'e': ['ee', 'eh'], 'i': ['ee', 'y'] };
+  for (const [from, tos] of Object.entries(vowelSwaps)) {
+    for (const to of tos) {
+      if (name.includes(from)) {
+        variants.add(name.replaceAll(from, to));
+      }
+    }
+  }
+
+  // Common suffixes speech adds: "dodo" → "dodos", "dodol"
+  variants.add(name + 's');
+  variants.add(name + 'l');
+
+  return variants;
+}
+
+function editDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = b[i - 1] === a[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[b.length][a.length];
 }

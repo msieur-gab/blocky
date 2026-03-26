@@ -25,9 +25,12 @@ let ready = false;
 export async function init() {
   await db.open();
 
-  // Ensure mode exists (default: home)
+  // Ensure defaults exist
   const mode = await getConfig('mode');
   if (!mode) await setConfig('mode', 'home');
+
+  const name = await getConfig('creatureName');
+  if (!name) await setConfig('creatureName', 'dodo');
 
   // Hospital mode: auto-wipe on page unload
   if (await getMode() === 'hospital') {
