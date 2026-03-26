@@ -4,7 +4,8 @@
 // ══════════════════════════════════════════
 
 import { bus } from './utils/events.js';
-import * as speech from './services/speech.js';
+import * as speech from './services/speech.js';  // legacy
+import * as ears from './services/ears.js';
 import * as sensors from './services/sensors.js';
 import * as camera from './services/camera.js';
 import * as faces from './services/faces.js';
@@ -161,6 +162,8 @@ function broadcastState() {
     shake: ss.shake.toFixed(2),
     rotating: ss.rotating ? 'yes' : 'no',
     faceDown: ss.faceDown ? 'yes' : 'no',
+    earsStage: ears.getStage(),
+    creatureName: ears.getCreatureName() || 'unnamed',
     knownFaces: faces.getKnownFaces(),
     gamePhase: rps.getPhase(),
     gameRound: rps.state.round,
@@ -189,7 +192,7 @@ function updateDevUI() {
   dom.outMode.textContent = cs.mode;
 
   // Transcript
-  const t = speech.getTranscript();
+  const t = ears.getTranscript() || speech.getTranscript();
   if (t) dom.transcript.textContent = t;
 
   // Companion state
@@ -272,7 +275,7 @@ startGate.addEventListener('click', async () => {
   startGate.classList.add('hidden');
 
   // These need user gesture
-  speech.init();
+  ears.init();   // two-stage listening (replaces speech.init)
   sensors.init();
   voice.init();
 

@@ -162,11 +162,9 @@ const DEDUP_WINDOW = 3000;
 // ══════════════════════════════════════════
 
 export async function init() {
-  // Classify complete sentences (finalized by Web Speech API)
-  bus.on('speech:sentence', onSentence);
-
-  // // Interim fast-path (commented out — testing NLU-only mode)
-  // bus.on('speech:interim', onInterim);
+  // Listen to ears service (two-stage) or legacy speech service
+  bus.on('ear:sentence', onSentence);
+  bus.on('speech:sentence', onSentence); // fallback compatibility
 
   // Init NLU engine in background (non-blocking)
   nlu.init().catch(e => console.warn('[intent] NLU init failed:', e));
