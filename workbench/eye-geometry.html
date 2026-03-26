@@ -12,7 +12,7 @@ body {
   color: #1a1a1a;
   font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif;
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr minmax(340px, 420px);
   height: 100vh;
 }
 
@@ -23,6 +23,7 @@ canvas { width: 92%; height: 70vh; background: #0a0a0f; }
   background: #fff;
   padding: 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   border-left: 2px solid #e0e0e0;
 }
 
@@ -38,9 +39,9 @@ h2:first-child { margin-top: 0; }
 .row input[type="range"] { flex: 1; height: 5px; accent-color: #3b82f6; cursor: pointer; }
 .row .v { width: 36px; text-align: right; font-size: 12px; font-weight: 600; color: #3b82f6; }
 
-/* Corner radius — 4 in a row */
-.corners { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 6px; }
-.corners .row label { width: 30px; font-size: 11px; }
+/* Corner radius */
+.corners { margin-bottom: 6px; }
+.corners .row label { width: 55px; }
 
 .toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .toggle label { font-size: 12px; color: #555; }
@@ -156,12 +157,12 @@ const D = {
   // Left eye
   lw: 40, lh: 80,
   ltl: 40, ltr: 40, lbr: 40, lbl: 40,  // corner radii: top-left, top-right, bottom-right, bottom-left
-  lrot: 0, lx: 0, ly: -10, lskewX: 0, lskewY: 0,
+  lrot: 0, lx: 0, ly: 0, lskewX: 0, lskewY: 0,
 
   // Right eye
   rw: 40, rh: 80,
   rtl: 40, rtr: 40, rbr: 40, rbl: 40,
-  rrot: 0, rx: 0, ry: -10, rskewX: 0, rskewY: 0,
+  rrot: 0, rx: 0, ry: 0, rskewX: 0, rskewY: 0,
 
   // Gaze
   gazeX: 0, gazeY: 0,
