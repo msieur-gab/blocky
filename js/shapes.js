@@ -65,6 +65,19 @@ export const eyes = {
     ctx.stroke();
   },
 
+  // Heart
+  heart(ctx, w, h) {
+    const r = Math.min(w, h);
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.3);
+    ctx.bezierCurveTo(-r * 0.1, -r * 0.1, -r, -r * 0.1, -r * 0.5, -r * 0.6);
+    ctx.bezierCurveTo(-r * 0.2, -r * 0.9, 0, -r * 0.7, 0, -r * 0.35);
+    ctx.bezierCurveTo(0, -r * 0.7, r * 0.2, -r * 0.9, r * 0.5, -r * 0.6);
+    ctx.bezierCurveTo(r, -r * 0.1, r * 0.1, -r * 0.1, 0, r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  },
+
   // Star (5-point)
   star(ctx, w, h) {
     const r = Math.min(w, h);
