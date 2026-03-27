@@ -365,17 +365,23 @@ export const sounds = {
   },
 
   snore_cycle(dur = 3.2) {
-    // Inhale — randomly pick variant
+    sounds.snore_inhale();
+    sounds.snore_exhale();
+  },
+
+  snore_inhale() {
     if (Math.random() > 0.5) {
       tone({ type: 'sine', freq: [405, 975], duration: 1.24, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
     } else {
       tone({ type: 'sine', freq: [160, 690], duration: 1.24, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
     }
-    // Exhale — randomly pick variant
+  },
+
+  snore_exhale() {
     if (Math.random() > 0.5) {
-      tone({ type: 'sine', freq: [980, 520], duration: 2, delay: 1, attack: 0.001, release: 0.7, volume: 4, vibrato: { rate: 20, depth: 74 }, filter: { type: 'highpass', freq: 3840, Q: 0.1 } });
+      tone({ type: 'sine', freq: [980, 520], duration: 2, attack: 0.001, release: 0.7, volume: 4, vibrato: { rate: 20, depth: 74 }, filter: { type: 'highpass', freq: 3840, Q: 0.1 } });
     } else {
-      tone({ type: 'sine', freq: [600, 380], duration: 1.24, delay: 1, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
+      tone({ type: 'sine', freq: [600, 380], duration: 1.24, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
     }
   },
 

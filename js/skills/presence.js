@@ -8,7 +8,7 @@
 
 const INTENT_MAP = {
   greet:          { chain: 'greet',              ambient: 'happy' },
-  sleep:          { chain: 'fallAsleep',         ambient: 'calm' },
+  sleep:          { chain: 'fallAsleep',         ambient: 'asleep' },
   bored:          { chain: 'long_silence',       ambient: 'bored' },
   story:          { chain: 'thinking_reaction',  ambient: 'curious' },
   emotion_happy:  { chain: 'child_laughed',      ambient: 'happy' },
@@ -137,6 +137,7 @@ export default {
   },
 
   handleIntent(intent, entities) {
+    const wasAsleep = asleep;
     resetIdle();
 
     const mapping = INTENT_MAP[intent];
@@ -145,8 +146,18 @@ export default {
     // Set ambient behavior
     if (mapping.ambient) ctx.face.setAmbient(mapping.ambient);
 
+    // If waking up, the outro is already playing via interruptMode()
+    // Don't fire a new chain — it will play after the outro finishes
+    if (wasAsleep && intent !== 'sleep') {
+      // The greet or other reaction will just be the ambient after outro
+      return true;
+    }
+
     // Play chain or gesture
-    if (mapping.chain) ctx.face.chain(mapping.chain);
+    if (mapping.chain) {
+      ctx.face.chain(mapping.chain);
+      if (intent === 'sleep') asleep = true;
+    }
     else if (mapping.gesture) ctx.face.head(mapping.gesture);
     else if (mapping.ambient) ctx.face.behavior(mapping.ambient);
 
