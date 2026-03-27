@@ -269,11 +269,78 @@ export const catalog = {
     ],
   },
 
+  // ── Agreement / Disagreement ──
+
+  agree: {
+    steps: [
+      { behavior: 'calm', dur: 120, face: { y: -8 } },
+      { behavior: 'calm', dur: 120, face: { y: 10 }, sound: 'chirp_short' },
+      { behavior: 'calm', dur: 120, face: { y: -6 } },
+      { behavior: 'calm', dur: 120, face: { y: 8 } },
+      { behavior: 'calm', dur: 100, face: { y: -3 } },
+    ],
+  },
+
+  agree_strong: {
+    steps: [
+      { behavior: 'happy', dur: 90, face: { y: -14 }, sound: 'chirp_up' },
+      { behavior: 'happy', dur: 90, face: { y: 16 } },
+      { behavior: 'happy', dur: 90, face: { y: -14 } },
+      { behavior: 'happy', dur: 90, face: { y: 16 }, sound: 'chirp_up' },
+      { behavior: 'happy', dur: 90, face: { y: -12 } },
+      { behavior: 'happy', dur: 90, face: { y: 14 } },
+      { behavior: 'happy', dur: 300 },
+    ],
+  },
+
+  agree_hesitant: {
+    steps: [
+      { behavior: 'thinking', dur: 500, sound: 'hum' },
+      { behavior: 'calm',     dur: 120, face: { y: -5 } },
+      { behavior: 'calm',     dur: 120, face: { y: 8 }, sound: 'chirp_short' },
+    ],
+  },
+
+  disagree: {
+    steps: [
+      { behavior: 'calm', dur: 100, face: { x: 14 }, sound: 'hum' },
+      { behavior: 'calm', dur: 100, face: { x: -14 } },
+      { behavior: 'calm', dur: 100, face: { x: 12 } },
+      { behavior: 'calm', dur: 100, face: { x: -12 } },
+      { behavior: 'calm', dur: 100, face: { x: 5 } },
+    ],
+  },
+
+  disagree_strong: {
+    steps: [
+      { behavior: 'calm', dur: 80, face: { x: 22 }, sound: 'grumble' },
+      { behavior: 'calm', dur: 80, face: { x: -22 } },
+      { behavior: 'calm', dur: 80, face: { x: 20 } },
+      { behavior: 'calm', dur: 80, face: { x: -20 } },
+      { behavior: 'calm', dur: 80, face: { x: 16 } },
+      { behavior: 'calm', dur: 80, face: { x: -16 }, sound: 'grumble' },
+      { behavior: 'calm', dur: 80, face: { x: 10 } },
+      { behavior: 'calm', dur: 80, face: { x: -10 } },
+    ],
+  },
+
+  // ── Curiosity loops ──
+
+  curious_loop: {
+    steps: [
+      { behavior: 'curious',   dur: 900, sound: 'babble_question' },
+      { behavior: 'curious_b', dur: 600 },
+      { behavior: 'curious',   dur: 1100, sound: 'chirp_short' },
+      { behavior: 'curious_b', dur: 700 },
+      { behavior: 'curious',   dur: 500 },
+    ],
+  },
+
   // ── Magic 8-ball ──
 
   magic8_thinking: {
     steps: [
-      { behavior: 'thinking', dur: 1300 },
+      { behavior: 'thinking', dur: 1300, sound: 'babble_question' },
     ],
   },
 
