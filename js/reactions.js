@@ -8,6 +8,157 @@ import { bus } from './utils/events.js';
 import { play as playSound } from './services/voice.js';
 import { isRadioPlaying } from './face.js';
 
+// ══════════════════════════════════════════
+// Head Movements — reusable body language
+// Pure movement: x, y, tilt, skewX, scale + timing
+// No expression, no sound — those come from composition
+// ══════════════════════════════════════════
+
+export const HEAD = {
+
+  // ── Yes / No ──
+
+  nod: [
+    { duration: 120, y: -8 },
+    { duration: 120, y: 10 },
+    { duration: 120, y: -6 },
+    { duration: 120, y: 8 },
+    { duration: 100, y: -3 },
+    { duration: 250 },
+  ],
+
+  nod_strong: [
+    { duration: 90, y: -14 },
+    { duration: 90, y: 16 },
+    { duration: 90, y: -14 },
+    { duration: 90, y: 16 },
+    { duration: 90, y: -12 },
+    { duration: 90, y: 14 },
+    { duration: 90, y: -10 },
+    { duration: 90, y: 12 },
+    { duration: 300 },
+  ],
+
+  shake: [
+    { duration: 100, skewX: 0.8,  x: 12 },
+    { duration: 100, skewX: -0.8, x: -12 },
+    { duration: 100, skewX: 0.6,  x: 10 },
+    { duration: 100, skewX: -0.6, x: -10 },
+    { duration: 100, skewX: 0.3,  x: 4 },
+    { duration: 250 },
+  ],
+
+  shake_strong: [
+    { duration: 80, skewX: 1.2,  x: 20 },
+    { duration: 80, skewX: -1.2, x: -20 },
+    { duration: 80, skewX: 1.0,  x: 18 },
+    { duration: 80, skewX: -1.0, x: -18 },
+    { duration: 80, skewX: 0.8,  x: 14 },
+    { duration: 80, skewX: -0.8, x: -14 },
+    { duration: 80, skewX: 0.5,  x: 8 },
+    { duration: 80, skewX: -0.5, x: -8 },
+    { duration: 350 },
+  ],
+
+  // ── Curiosity / Thinking ──
+
+  tilt_left: [
+    { duration: 300, tilt: 12, x: -4 },
+    { duration: 600, tilt: 10, x: -3 },
+    { duration: 300, tilt: 0 },
+  ],
+
+  tilt_right: [
+    { duration: 300, tilt: -12, x: 4 },
+    { duration: 600, tilt: -10, x: 3 },
+    { duration: 300, tilt: 0 },
+  ],
+
+  wonder: [
+    { duration: 400, tilt: 8,  skewX: 0.4, x: 6 },
+    { duration: 400, tilt: -6, skewX: -0.3, x: -5 },
+    { duration: 350, tilt: 5,  skewX: 0.2, x: 4 },
+    { duration: 350, tilt: -4, skewX: -0.2, x: -3 },
+    { duration: 300 },
+  ],
+
+  // ── Surprise / Reflex ──
+
+  startle: [
+    { duration: 80, y: -12, scale: 1.08 },
+    { duration: 150, y: -6, scale: 1.04 },
+    { duration: 250, y: 0, scale: 1 },
+  ],
+
+  recoil: [
+    { duration: 100, y: 8, scale: 0.92 },
+    { duration: 200, y: 4, scale: 0.96 },
+    { duration: 300, scale: 1 },
+  ],
+
+  // ── Idle / Ambient ──
+
+  wiggle: [
+    { duration: 150, tilt: 6, x: 4 },
+    { duration: 150, tilt: -6, x: -4 },
+    { duration: 150, tilt: 5, x: 3 },
+    { duration: 150, tilt: -5, x: -3 },
+    { duration: 200 },
+  ],
+
+  peek_left: [
+    { duration: 250, x: -14, skewX: 0.3, tilt: 4 },
+    { duration: 500, x: -12, skewX: 0.25 },
+    { duration: 300 },
+  ],
+
+  peek_right: [
+    { duration: 250, x: 14, skewX: -0.3, tilt: -4 },
+    { duration: 500, x: 12, skewX: -0.25 },
+    { duration: 300 },
+  ],
+
+  droop: [
+    { duration: 400, y: 10, scale: 0.96 },
+    { duration: 800, y: 8, scale: 0.97 },
+    { duration: 400, scale: 1 },
+  ],
+
+  perk: [
+    { duration: 150, y: -10, scale: 1.05 },
+    { duration: 250, y: -4, scale: 1.02 },
+    { duration: 300, scale: 1 },
+  ],
+
+  bob: [
+    { duration: 200, y: -6 },
+    { duration: 200, y: 4 },
+    { duration: 200, y: -5 },
+    { duration: 200, y: 3 },
+    { duration: 200 },
+  ],
+};
+
+// ══════════════════════════════════════════
+// Compose — merge head movement + expression
+// compose('shake', 'calm')
+// compose('nod_strong', 'happy', { 0: 'chirp_up', 3: 'chirp_up' })
+// compose('shake_strong', ['calm','calm','calm','annoyed','annoyed','calm'], { 0: 'grumble' })
+// ══════════════════════════════════════════
+
+export function compose(movementName, expr, sounds = {}) {
+  const beats = HEAD[movementName];
+  if (!beats) { console.warn(`[reactions] Unknown movement: ${movementName}`); return []; }
+
+  const exprArr = Array.isArray(expr) ? expr : null;
+
+  return beats.map((beat, i) => ({
+    expr: exprArr ? (exprArr[i] || exprArr[exprArr.length - 1]) : expr,
+    ...beat,
+    ...(sounds[i] !== undefined ? { sound: sounds[i] } : {}),
+  }));
+}
+
 // ── Reaction definitions ──
 // Each reaction is an array of keyframes: { expr, duration, ease? }
 // Last keyframe holds until next reaction or mood takes over
@@ -24,14 +175,23 @@ const REACTIONS = {
   goodnight: [
     { expr: 'happy',     duration: 400, sound: 'hum' },
     { expr: 'sleepy',    duration: 800, sound: 'hum_sad' },
+    { expr: 'drowsy',    duration: 1200 },
+    { expr: 'asleep',    duration: 800 },
   ],
 
+  // Fall asleep: yawn → drowsy → eyes close
+  fallAsleep: [
+    { expr: 'yawn',      duration: 1500, sound: 'yawn_sound' },
+    { expr: 'drowsy',    duration: 1200 },
+    { expr: 'asleep',    duration: 800 },
+  ],
+
+  // Breathing loop while sleeping
   sleep: {
     loop: true,
     frames: [
-      { expr: 'yawn',      duration: 1500, sound: 'yawn_sound' },
-      { expr: 'sleepy',    duration: 3200, sound: 'snore_cycle' },
-      { expr: 'sleepy',    duration: 3200, sound: 'snore_cycle' },
+      { expr: 'sleep_exhale', duration: 2500, sound: 'snore_cycle' },
+      { expr: 'sleep_inhale', duration: 2500 },
     ],
   },
 
@@ -153,54 +313,17 @@ const REACTIONS = {
 
   // ── Agreement / Disagreement ──
 
-  // Slight nod — "mhm"
-  agree: [
-    { expr: 'calm',    duration: 200, y: -3 },
-    { expr: 'calm',    duration: 200, y: 4, sound: 'chirp_short' },
-    { expr: 'calm',    duration: 200, y: -2 },
-    { expr: 'calm',    duration: 200, y: 3 },
-    { expr: 'calm',    duration: 300 },
-  ],
+  // ── Agreement / Disagreement (composed) ──
 
-  // Enthusiastic nod — "YES!"
-  agree_strong: [
-    { expr: 'happy',   duration: 150, y: -5, sound: 'chirp_up' },
-    { expr: 'happy',   duration: 150, y: 6 },
-    { expr: 'happy',   duration: 150, y: -5 },
-    { expr: 'happy',   duration: 150, y: 6, sound: 'chirp_up' },
-    { expr: 'happy',   duration: 150, y: -4 },
-    { expr: 'happy',   duration: 150, y: 5 },
-    { expr: 'excited', duration: 150, y: -3 },
-    { expr: 'excited', duration: 150, y: 4, sound: 'babble_excited' },
-    { expr: 'happy',   duration: 400 },
-  ],
+  agree:           compose('nod', 'calm', { 1: 'chirp_short' }),
+  agree_strong:    compose('nod_strong', ['happy','happy','happy','happy','happy','happy','excited','excited','happy'], { 0: 'chirp_up', 3: 'chirp_up', 7: 'babble_excited' }),
+  disagree:        compose('shake', 'calm', { 1: 'hum' }),
+  disagree_strong: compose('shake_strong', 'calm', { 0: 'grumble', 5: 'grumble' }),
 
-  // Slight head shake — "nah"
-  disagree: [
-    { expr: 'calm',    duration: 180, skewX: 0.4 },
-    { expr: 'calm',    duration: 180, skewX: -0.4, sound: 'hum' },
-    { expr: 'calm',    duration: 180, skewX: 0.3 },
-    { expr: 'calm',    duration: 180, skewX: -0.3 },
-    { expr: 'calm',    duration: 300 },
-  ],
-
-  // Strong head shake — "NO!"
-  disagree_strong: [
-    { expr: 'angry',   duration: 130, skewX: 0.7, sound: 'grumble' },
-    { expr: 'angry',   duration: 130, skewX: -0.7 },
-    { expr: 'angry',   duration: 130, skewX: 0.6 },
-    { expr: 'angry',   duration: 130, skewX: -0.6 },
-    { expr: 'angry',   duration: 130, skewX: 0.5 },
-    { expr: 'angry',   duration: 130, skewX: -0.5, sound: 'grumble' },
-    { expr: 'determined', duration: 400 },
-  ],
-
-  // Hesitant — "ehh... I guess"
+  // Hesitant — thinking pause, then reluctant nod
   agree_hesitant: [
-    { expr: 'thinking', duration: 600, sound: 'hum', tilt: 5 },
-    { expr: 'calm',     duration: 200, y: -2 },
-    { expr: 'calm',     duration: 200, y: 3 },
-    { expr: 'calm',     duration: 300, sound: 'chirp_short' },
+    { expr: 'thinking', duration: 500, sound: 'hum', tilt: 8 },
+    ...compose('nod', 'calm', { 1: 'chirp_short' }).slice(0, 3),
   ],
 
   // ── Music ──

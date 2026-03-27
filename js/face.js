@@ -4,8 +4,8 @@
 // Independent per-eye rendering
 // ══════════════════════════════════════════
 
-import { lerp } from './utils/math.js';
-import { eyes as eyeShapes, mouths as mouthShapes } from './shapes.js';
+import { lerp, clamp } from './utils/math.js';
+import { eyes as symbolShapes, mouths as mouthShapes } from './shapes.js';
 import { NEUTRAL, DEFAULT_EYE, DEFAULT_MOUTH, DEFAULT_FACE } from './expressions.js';
 
 let canvas, ctx;
@@ -29,6 +29,16 @@ let blinkTimer = 3;
 let blinksRemaining = 0;
 let blinkPause = 0;
 let breathPhase = 0;
+
+// Micro-drift — eyes never perfectly still
+let driftPhase = Math.random() * 100;
+
+// Gaze — autonomous look direction, independent from expression
+let gazeX = 0;         // current gaze offset (-1 to 1)
+let gazeY = 0;
+let gazeTargetX = 0;   // where gaze is drifting toward
+let gazeTargetY = 0;
+let gazeTimer = 0;     // time until next gaze shift
 
 // Scan mode — eyes become the scanner
 let scanning = false;
@@ -120,17 +130,27 @@ export function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   cx = W / 2;
   cy = H / 2;
-  scale = Math.min(W, H) / 280;
+  scale = Math.min(W, H) / 560;
 }
 
-// ── Lerp helpers ──
+// ── Eased interpolation ──
+
+function easedFactor(speed, dt) {
+  const t = clamp(speed * dt, 0, 1);
+  return 1 - (1 - t) * (1 - t) * (1 - t); // ease-out cubic
+}
+
+function easedLerp(current, target, speed, dt) {
+  return lerp(current, target, easedFactor(speed, dt));
+}
 
 function lerpObj(current, target, speed, dt) {
+  const f = easedFactor(speed, dt);
   for (const k of Object.keys(target)) {
     if (typeof target[k] === 'number' && typeof current[k] === 'number') {
-      current[k] = lerp(current[k], target[k], speed * dt);
-    } else if (typeof target[k] === 'string') {
-      current[k] = target[k]; // shapes snap
+      current[k] = lerp(current[k], target[k], f);
+    } else {
+      current[k] = target[k]; // shapes, nulls — snap instantly
     }
   }
 }
@@ -138,12 +158,13 @@ function lerpObj(current, target, speed, dt) {
 // ── Update ──
 
 export function update(dt, target) {
-  // Lerp each sub-object
-  face.eyeGap = lerp(face.eyeGap, target.eyeGap ?? NEUTRAL.eyeGap, 4 * dt);
-  lerpObj(face.leftEye, target.leftEye, 4, dt);
-  lerpObj(face.rightEye, target.rightEye, 4, dt);
-  lerpObj(face.mouth, target.mouth, 4, dt);
-  lerpObj(face.face, target.face, 4, dt);
+  // Eased interpolation everywhere — ease-out cubic
+  // Eyes/mouth: smooth (6). Face transforms: snappy (12) so nods/shakes land.
+  face.eyeGap = easedLerp(face.eyeGap, target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
+  lerpObj(face.leftEye, target.leftEye, 6, dt);
+  lerpObj(face.rightEye, target.rightEye, 6, dt);
+  lerpObj(face.mouth, target.mouth, 6, dt);
+  lerpObj(face.face, target.face, 12, dt);
 
   // Blink — single (70%) or double (30%), disabled during scan
   if (scanAmt < 0.5) {
@@ -182,6 +203,18 @@ export function update(dt, target) {
   }
 
   breathPhase += dt * 1.2;
+  driftPhase += dt;
+
+  // Gaze wandering — pick a new target every 2-5s
+  gazeTimer -= dt;
+  if (gazeTimer <= 0) {
+    gazeTargetX = (Math.random() - 0.5) * 1.4;
+    gazeTargetY = (Math.random() - 0.5) * 0.8;
+    gazeTimer = 2 + Math.random() * 3;
+  }
+  // Ease toward gaze target (slow, organic)
+  gazeX = easedLerp(gazeX, gazeTargetX, 1.5, dt);
+  gazeY = easedLerp(gazeY, gazeTargetY, 1.5, dt);
 
   // Radio groove — head sway + mouth pulse
   if (radioPlaying) {
@@ -307,6 +340,19 @@ export function draw() {
 
 // ── Normal eye drawing ──
 
+function eyePosition(side, eye, skX, skY) {
+  const driftSeed = side * 1.7;
+  const microX = Math.sin(driftPhase * 2.3 + driftSeed) * 1.5 * scale
+                + Math.sin(driftPhase * 5.1 + driftSeed * 3) * 0.6 * scale;
+  const microY = Math.sin(driftPhase * 1.9 + driftSeed * 2) * 1.0 * scale
+                + Math.cos(driftPhase * 4.3 + driftSeed) * 0.4 * scale;
+  const perspShift = skX * side * -8 * scale;
+  return {
+    x: side * face.eyeGap * scale / 2 + (eye.x || 0) * scale + perspShift + microX + gazeX * 10 * scale,
+    y: (eye.y || 0) * scale + skY * side * -4 * scale + microY + gazeY * 5 * scale,
+  };
+}
+
 function drawNormalEyes(fg, gap, skX, skY) {
   [
     { side: -1, eye: face.leftEye },
@@ -316,19 +362,22 @@ function drawNormalEyes(fg, gap, skX, skY) {
     const ew = eye.w * scale / 2 * perspScale;
     let eh = eye.h * scale / 2 * perspScale;
 
-    // Blink squashes height
-    eh = eh * (1 - blinkAmt * 0.92);
-    eh = Math.max(1.5 * scale, eh);
+    // Blink squashes height — but skip if eyes already nearly closed (sleeping)
+    const eyeAlreadyClosed = eh < 8 * scale;
+    const blinkScale = eyeAlreadyClosed ? 1 : (1 - blinkAmt * 0.92);
+    eh = Math.max(1.5 * scale, eh * blinkScale);
 
-    const perspShift = skX * side * -8 * scale;
-    const ex = side * gap + eye.x * scale + perspShift;
-    const ey = eye.y * scale + skY * side * -4 * scale;
-    const tilt = eye.tilt * side * Math.PI / 180;
-    const r = (eye.round || 0) * scale / 2 * perspScale;
+    const pos = eyePosition(side, eye, skX, skY);
+    const tilt = (eye.tilt || 0) * Math.PI / 180;
 
     ctx.save();
-    ctx.translate(ex, ey);
+    ctx.translate(pos.x, pos.y);
     ctx.rotate(tilt);
+
+    // Per-eye skew
+    if (eye.skewX || eye.skewY) {
+      ctx.transform(1, eye.skewY || 0, eye.skewX || 0, 1, 0, 0);
+    }
 
     ctx.fillStyle = fg;
     ctx.strokeStyle = fg;
@@ -336,35 +385,38 @@ function drawNormalEyes(fg, gap, skX, skY) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (blinkAmt < 0.8) {
-      const drawFn = eyeShapes[eye.shape] || eyeShapes.pill;
-      drawFn(ctx, ew, eh, r);
+    if ((!eyeAlreadyClosed && blinkScale < 0.12) || eh < ew * 0.15) {
+      // Eyes too thin for pill — draw a line (blink or squished expression)
+      ctx.beginPath();
+      ctx.moveTo(-ew * 0.75, 0);
+      ctx.lineTo(ew * 0.75, 0);
+      ctx.stroke();
+    } else if (eye.shape && symbolShapes[eye.shape]) {
+      // Symbol override (star, musicNote, digit, etc.)
+      symbolShapes[eye.shape](ctx, ew, eh, Math.min(ew, eh));
+    } else {
+      // Pill with 4 independent corner radii + independent top/bottom shift
+      const st = (eye.shiftTop || 0) * scale / 2;
+      const sb = (eye.shiftBot || 0) * scale / 2;
+
+      // Clamp radii against RENDERED half-dimensions (after blink squash)
+      const ctl = Math.min((eye.tl ?? 50) * scale * perspScale, ew, eh);
+      const ctr = Math.min((eye.tr ?? 50) * scale * perspScale, ew, eh);
+      const cbr = Math.min((eye.br ?? 50) * scale * perspScale, ew, eh);
+      const cbl = Math.min((eye.bl ?? 50) * scale * perspScale, ew, eh);
+
+      ctx.beginPath();
+      ctx.moveTo(st, -eh);
+      ctx.arcTo( ew + st, -eh,  ew + sb,  eh, ctr);
+      ctx.arcTo( ew + sb,  eh, -ew + sb,  eh, cbr);
+      ctx.arcTo(-ew + sb,  eh, -ew + st, -eh, cbl);
+      ctx.arcTo(-ew + st, -eh,  ew + st, -eh, ctl);
+      ctx.closePath();
+      ctx.fill();
     }
 
     ctx.restore();
   });
-
-  // Blink line
-  if (blinkAmt > 0.8) {
-    ctx.strokeStyle = fg;
-    ctx.lineWidth = 2.5 * scale;
-    ctx.lineCap = 'round';
-
-    [
-      { side: -1, eye: face.leftEye },
-      { side:  1, eye: face.rightEye },
-    ].forEach(({ side, eye }) => {
-      const ps = 1 + skX * side * 0.4;
-      const ew = eye.w * scale / 2 * ps;
-      const pShift = skX * side * -8 * scale;
-      const ex = side * gap + (eye.x || 0) * scale + pShift;
-      const ey = (eye.y || 0) * scale + skY * side * -4 * scale;
-      ctx.beginPath();
-      ctx.moveTo(ex - ew * 0.7, ey);
-      ctx.lineTo(ex + ew * 0.7, ey);
-      ctx.stroke();
-    });
-  }
 }
 
 // ── Scan eye drawing ──

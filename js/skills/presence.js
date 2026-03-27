@@ -4,11 +4,13 @@
 // Manages mood, agreement, emotions, idle life
 // ══════════════════════════════════════════
 
+import { HEAD, compose } from '../reactions.js';
+
 // ── Intent → mood + reaction mapping ──
 
 const INTENT_MAP = {
   greet:          { reaction: 'greet',         mood: 'happy' },
-  sleep:          { reaction: 'sleep',         mood: 'sleepy' },
+  sleep:          { reaction: 'fallAsleep',     mood: 'asleep' },
   bored:          { reaction: 'long_silence',  mood: 'bored' },
   story:          { reaction: 'thinking',      mood: 'curious' },
   emotion_happy:  { reaction: 'child_laughed', mood: 'happy' },
@@ -22,7 +24,7 @@ const INTENT_MAP = {
   agree:          { reaction: 'agree',         mood: 'calm' },
   agree_strong:   { reaction: 'agree_strong',  mood: 'happy' },
   disagree:       { reaction: 'disagree',      mood: 'calm' },
-  disagree_strong:{ reaction: 'disagree_strong',mood: 'angry' },
+  disagree_strong:{ reaction: 'disagree_strong',mood: 'calm' },
   negation:       { reaction: null,            mood: 'calm' },
   stop:           { reaction: null,            mood: 'calm' },
 };
@@ -38,7 +40,7 @@ const TIER1_MIN = 6000;
 const TIER1_MAX = 15000;
 const SLEEP_THRESHOLD = 300; // 5 min silence → fall asleep
 
-const FIDGETS = ['idle_look_around', 'idle_chirp', 'idle_blink_slow', 'idle_hum'];
+const FIDGETS = ['idle_look_around', 'idle_chirp', 'idle_blink_slow', 'idle_hum', 'idle_peek', 'idle_peek_r', 'idle_wiggle'];
 const BORED = ['idle_sigh', 'idle_self_amused', 'idle_babble', 'idle_fart', 'idle_burp', 'idle_hiccup', 'idle_belly', 'idle_sneeze'];
 const SLEEPY = ['idle_yawn', 'idle_doze'];
 
@@ -60,8 +62,10 @@ function scheduleIdle() {
 
     if (ctx?.state?.silenceDuration > SLEEP_THRESHOLD) {
       asleep = true;
-      ctx.face.react('sleep');
-      ctx.face.mood('sleepy');
+      ctx.face.react('fallAsleep');
+      ctx.face.mood('asleep');
+      // After fallAsleep finishes, start breathing loop
+      setTimeout(() => { if (asleep) ctx.face.react('sleep'); }, 3500);
       ctx.memory.log({ category: 'personality', data: { event: 'fell_asleep' } });
       return;
     }
@@ -98,77 +102,59 @@ export default {
   intents: Object.keys(INTENT_MAP),
 
   reactions: {
-    // Idle reactions
-    idle_look_around: [
-      { expr: 'look_bl',  duration: 500, sound: 'chirp_short' },
-      { expr: 'look_tr',  duration: 400 },
-      { expr: 'curious',  duration: 300 },
-      { expr: 'calm',     duration: 400 },
-    ],
-    idle_chirp: [
-      { expr: 'surprise', duration: 200, sound: 'chirp_up' },
-      { expr: 'calm',     duration: 500 },
-    ],
+    // Idle reactions — head movements + expressions composed
+
+    // Fidgets: alive, attentive
+    idle_look_around: compose('wonder', ['curious','curious','curious','curious','calm'], { 0: 'chirp_short' }),
+    idle_chirp:       compose('perk', 'surprise', { 0: 'chirp_up' }),
+    idle_peek:        compose('peek_left', 'curious', { 0: 'chirp_short' }),
+    idle_peek_r:      compose('peek_right', 'curious'),
     idle_blink_slow: [
       { expr: 'sleepy',   duration: 400 },
       { expr: 'calm',     duration: 300 },
     ],
-    idle_hum: [
-      { expr: 'calm',     duration: 800, sound: 'hum' },
-    ],
-    idle_sigh: [
-      { expr: 'bored',    duration: 1000, sound: 'grumble' },
-      { expr: 'calm',     duration: 500 },
-    ],
+    idle_hum:         compose('bob', 'calm', { 0: 'hum' }),
+    idle_wiggle:      compose('wiggle', 'happy', { 0: 'chirp_short' }),
+
+    // Bored: character, self-entertainment
+    idle_sigh:        compose('droop', 'bored', { 0: 'grumble' }),
     idle_self_amused: [
-      { expr: 'thinking', duration: 600, sound: 'babble_question' },
-      { expr: 'silly',    duration: 500, sound: 'giggle' },
-      { expr: 'calm',     duration: 400 },
+      ...compose('tilt_left', ['thinking','thinking','silly'], { 0: 'babble_question' }),
+      { expr: 'calm', duration: 400, sound: 'giggle' },
     ],
-    idle_babble: [
-      { expr: 'curious',  duration: 300, sound: 'babble_slow' },
-      { expr: 'happy',    duration: 400 },
-      { expr: 'calm',     duration: 300 },
-    ],
+    idle_babble:      compose('wiggle', ['curious','happy','happy','calm','calm'], { 0: 'babble_slow' }),
     idle_fart: [
       { expr: 'calm',     duration: 300 },
-      { expr: 'surprise', duration: 200, sound: 'fart_squeak' },
+      ...compose('startle', 'surprise', { 0: 'fart_squeak' }),
       { expr: 'embarrassed', duration: 600 },
       { expr: 'silly',    duration: 400, sound: 'giggle' },
-      { expr: 'calm',     duration: 300 },
     ],
     idle_burp: [
-      { expr: 'surprise', duration: 150, sound: 'burp' },
+      ...compose('startle', 'surprise', { 0: 'burp' }),
       { expr: 'embarrassed', duration: 500 },
       { expr: 'calm',     duration: 400 },
     ],
     idle_hiccup: [
-      { expr: 'surprise', duration: 100, sound: 'hiccup' },
+      ...compose('startle', 'surprise', { 0: 'hiccup' }),
       { expr: 'calm',     duration: 300 },
-      { expr: 'surprise', duration: 100, sound: 'hiccup_double' },
+      ...compose('startle', 'surprise', { 0: 'hiccup_double' }),
       { expr: 'annoyed',  duration: 400 },
-      { expr: 'calm',     duration: 300 },
     ],
     idle_belly: [
-      { expr: 'surprise', duration: 200, sound: 'belly_rumble' },
+      ...compose('recoil', 'surprise', { 0: 'belly_rumble' }),
       { expr: 'embarrassed', duration: 500 },
       { expr: 'calm',     duration: 300 },
     ],
     idle_sneeze: [
       { expr: 'thinking', duration: 600 },
-      { expr: 'shocked',  duration: 150, sound: 'sneeze' },
-      { expr: 'dizzy',    duration: 400, tilt: 5 },
-      { expr: 'calm',     duration: 400 },
+      ...compose('recoil', ['shocked','dizzy','calm'], { 0: 'sneeze' }),
     ],
-    idle_yawn: [
-      { expr: 'yawn',     duration: 1200, sound: 'yawn_sound' },
-      { expr: 'sleepy',   duration: 800 },
-      { expr: 'calm',     duration: 500 },
-    ],
+
+    // Sleepy: winding down
+    idle_yawn:        compose('droop', ['yawn','yawn','drowsy'], { 0: 'yawn_sound' }),
     idle_doze: [
-      { expr: 'sleepy',   duration: 1500, sound: 'hum_sad' },
-      { expr: 'yawn',     duration: 1000, sound: 'yawn_sound' },
-      { expr: 'sleepy',   duration: 2000 },
+      { expr: 'drowsy',   duration: 1500, sound: 'hum_sad' },
+      ...compose('droop', ['yawn','drowsy','drowsy'], { 0: 'yawn_sound' }),
     ],
   },
 
@@ -193,6 +179,12 @@ export default {
 
     ctx.face.mood(mapping.mood);
     if (mapping.reaction) ctx.face.react(mapping.reaction);
+
+    // Sleep intent — start breathing loop after fallAsleep finishes
+    if (intent === 'sleep') {
+      asleep = true;
+      setTimeout(() => { if (asleep) ctx.face.react('sleep'); }, 3500);
+    }
 
     // Log interaction
     ctx.memory.log({ category: 'interaction', data: { intent, mood: mapping.mood } });

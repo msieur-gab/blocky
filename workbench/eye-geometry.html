@@ -96,6 +96,8 @@ h2:first-child { margin-top: 0; }
   <div id="tab-left" class="tab-content on">
     <h2>Size</h2>
     <div id="sl-lsize"></div>
+    <h2>Shift (top/bottom half)</h2>
+    <div id="sl-lshift"></div>
     <h2>Corner Radii</h2>
     <div class="corners" id="sl-lcorners"></div>
     <h2>Transform</h2>
@@ -110,6 +112,8 @@ h2:first-child { margin-top: 0; }
   <div id="tab-right" class="tab-content">
     <h2>Size</h2>
     <div id="sl-rsize"></div>
+    <h2>Shift (top/bottom half)</h2>
+    <div id="sl-rshift"></div>
     <h2>Corner Radii</h2>
     <div class="corners" id="sl-rcorners"></div>
     <h2>Transform</h2>
@@ -153,15 +157,19 @@ h2:first-child { margin-top: 0; }
 // State — per-eye with 4 independent corner radii
 // ══════════════════════════════════════════
 
+// All values match Figma coordinate space:
+// w/h = full width/height, radii = Figma corner radius, gap = center-to-center
 const D = {
   // Left eye
-  lw: 40, lh: 80,
-  ltl: 40, ltr: 40, lbr: 40, lbl: 40,  // corner radii: top-left, top-right, bottom-right, bottom-left
+  lw: 100, lh: 200,
+  ltl: 50, ltr: 50, lbr: 50, lbl: 50,
+  lshiftTop: 0, lshiftBot: 0,
   lrot: 0, lx: 0, ly: 0, lskewX: 0, lskewY: 0,
 
   // Right eye
-  rw: 40, rh: 80,
-  rtl: 40, rtr: 40, rbr: 40, rbl: 40,
+  rw: 100, rh: 200,
+  rtl: 50, rtr: 50, rbr: 50, rbl: 50,
+  rshiftTop: 0, rshiftBot: 0,
   rrot: 0, rx: 0, ry: 0, rskewX: 0, rskewY: 0,
 
   // Gaze
@@ -169,7 +177,7 @@ const D = {
   // Head
   headTilt: 0, headX: 0, headY: 0, headScale: 1.0,
   // Gap
-  gap: 200,
+  gap: 400,
   // Micro-life
   breathAmp: 2, driftAmp: 1.5, driftSpeed: 0.8,
 };
@@ -181,17 +189,19 @@ const S = { ...D };
 // ══════════════════════════════════════════
 
 const SL = {
-  lsize:      [{ k:'lw', l:'width', mn:5, mx:80 }, { k:'lh', l:'height', mn:5, mx:120 }],
-  lcorners:   [{ k:'ltl', l:'TL', mn:0, mx:80 }, { k:'ltr', l:'TR', mn:0, mx:80 }, { k:'lbl', l:'BL', mn:0, mx:80 }, { k:'lbr', l:'BR', mn:0, mx:80 }],
-  ltransform: [{ k:'lrot', l:'rotate', mn:-45, mx:45 }, { k:'lx', l:'x', mn:-30, mx:30 }, { k:'ly', l:'y', mn:-40, mx:40 }, { k:'lskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'lskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
+  lsize:      [{ k:'lw', l:'width', mn:10, mx:200 }, { k:'lh', l:'height', mn:10, mx:300 }],
+  lshift:     [{ k:'lshiftTop', l:'top', mn:-80, mx:80 }, { k:'lshiftBot', l:'bottom', mn:-80, mx:80 }],
+  lcorners:   [{ k:'ltl', l:'TL', mn:0, mx:100 }, { k:'ltr', l:'TR', mn:0, mx:100 }, { k:'lbl', l:'BL', mn:0, mx:100 }, { k:'lbr', l:'BR', mn:0, mx:100 }],
+  ltransform: [{ k:'lrot', l:'rotate', mn:-45, mx:45 }, { k:'lx', l:'x', mn:-60, mx:60 }, { k:'ly', l:'y', mn:-80, mx:80 }, { k:'lskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'lskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
 
-  rsize:      [{ k:'rw', l:'width', mn:5, mx:80 }, { k:'rh', l:'height', mn:5, mx:120 }],
-  rcorners:   [{ k:'rtl', l:'TL', mn:0, mx:80 }, { k:'rtr', l:'TR', mn:0, mx:80 }, { k:'rbl', l:'BL', mn:0, mx:80 }, { k:'rbr', l:'BR', mn:0, mx:80 }],
-  rtransform: [{ k:'rrot', l:'rotate', mn:-45, mx:45 }, { k:'rx', l:'x', mn:-30, mx:30 }, { k:'ry', l:'y', mn:-40, mx:40 }, { k:'rskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'rskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
+  rsize:      [{ k:'rw', l:'width', mn:10, mx:200 }, { k:'rh', l:'height', mn:10, mx:300 }],
+  rshift:     [{ k:'rshiftTop', l:'top', mn:-80, mx:80 }, { k:'rshiftBot', l:'bottom', mn:-80, mx:80 }],
+  rcorners:   [{ k:'rtl', l:'TL', mn:0, mx:100 }, { k:'rtr', l:'TR', mn:0, mx:100 }, { k:'rbl', l:'BL', mn:0, mx:100 }, { k:'rbr', l:'BR', mn:0, mx:100 }],
+  rtransform: [{ k:'rrot', l:'rotate', mn:-45, mx:45 }, { k:'rx', l:'x', mn:-60, mx:60 }, { k:'ry', l:'y', mn:-80, mx:80 }, { k:'rskewX', l:'skewX', mn:-50, mx:50, sc:0.01 }, { k:'rskewY', l:'skewY', mn:-50, mx:50, sc:0.01 }],
 
   gaze:  [{ k:'gazeX', l:'X', mn:-100, mx:100, sc:0.01 }, { k:'gazeY', l:'Y', mn:-100, mx:100, sc:0.01 }],
-  head:  [{ k:'headTilt', l:'tilt', mn:-30, mx:30 }, { k:'headX', l:'x', mn:-40, mx:40 }, { k:'headY', l:'y', mn:-40, mx:40 }, { k:'headScale', l:'scale', mn:50, mx:150, sc:0.01 }],
-  gap:   [{ k:'gap', l:'gap', mn:80, mx:350, st:5 }],
+  head:  [{ k:'headTilt', l:'tilt', mn:-30, mx:30 }, { k:'headX', l:'x', mn:-80, mx:80 }, { k:'headY', l:'y', mn:-80, mx:80 }, { k:'headScale', l:'scale', mn:50, mx:150, sc:0.01 }],
+  gap:   [{ k:'gap', l:'gap', mn:150, mx:700, st:10 }],
   breath:[{ k:'breathAmp', l:'amplitude', mn:0, mx:8, st:0.5 }],
   drift: [{ k:'driftAmp', l:'amplitude', mn:0, mx:5, st:0.5 }, { k:'driftSpeed', l:'speed', mn:0, mx:3, st:0.1 }],
 };
@@ -200,25 +210,27 @@ const SL = {
 // Presets — from Figma reference
 // ══════════════════════════════════════════
 
+// Presets in Figma coordinates (w:100, h:200, radii:50, gap:400 = default)
+// Only override what differs from default
 const P = {
   calm:       {},
-  attentive:  { lrot: 3, rrot: -5, lh: 75, rh: 75 },
-  worried:    { lw: 30, lh: 55, rw: 30, rh: 55, ltl: 20, ltr: 25, rtl: 25, rtr: 20, lbl: 35, lbr: 35, rbl: 35, rbr: 35 },
-  curious:    { lw: 45, lh: 90, rw: 35, rh: 70, lrot: -8, rrot: 12, ltl: 45, lbl: 35, rtl: 30, rtr: 40, headTilt: 8 },
-  happy:      { lh: 60, rh: 60, ltl: 30, ltr: 30, rtl: 30, rtr: 30, lbl: 45, lbr: 45, rbl: 45, rbr: 45 },
-  sleepy:     { lh: 15, rh: 15, lw: 50, rw: 50, ltl: 10, ltr: 10, rtl: 10, rtr: 10, lbl: 10, lbr: 10, rbl: 10, rbr: 10, ly: 5, ry: 5 },
-  sad:        { lh: 70, rh: 70, ltl: 15, ltr: 30, rtl: 30, rtr: 15, lbl: 50, lbr: 40, rbl: 40, rbr: 50, lrot: 10, rrot: -10, ly: 5, ry: 5 },
-  silly:      { lw: 42, lh: 75, rw: 38, rh: 65, ltl: 50, ltr: 30, rtl: 35, rtr: 50, lbl: 30, lbr: 50, rbl: 50, rbr: 30, lrot: 12, rrot: -8 },
-  angry:      { lh: 50, rh: 50, lw: 45, rw: 45, ltl: 8, ltr: 30, rtl: 30, rtr: 8, lbl: 35, lbr: 35, rbl: 35, rbr: 35, lrot: -15, rrot: 15 },
-  excited:    { lw: 50, lh: 95, rw: 50, rh: 95, gap: 220 },
-  surprise:   { lw: 55, lh: 100, rw: 55, rh: 100, gap: 230 },
-  scared:     { lw: 48, lh: 105, rw: 48, rh: 105, gap: 240, ltl: 50, ltr: 50, rtl: 50, rtr: 50 },
-  love:       { lh: 65, rh: 65, lw: 45, rw: 45, ltl: 45, ltr: 45, rtl: 45, rtr: 45, lbl: 45, lbr: 45, rbl: 45, rbr: 45, lrot: 8, rrot: -8 },
-  suspicious: { lh: 25, rh: 30, lw: 48, rw: 45, ltl: 8, ltr: 15, rtl: 15, rtr: 8, lbl: 15, lbr: 8, rbl: 8, rbr: 15, lrot: -3, rrot: 5 },
-  thinking:   { lw: 35, lh: 70, rw: 42, rh: 85, lrot: 0, rrot: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
-  determined: { lh: 55, rh: 55, lw: 44, rw: 44, ltl: 8, ltr: 25, rtl: 25, rtr: 8, lbl: 30, lbr: 30, rbl: 30, rbr: 30, lrot: -8, rrot: 8 },
-  wink:       { lh: 8, lw: 40, ltl: 5, ltr: 5, lbl: 5, lbr: 5, rh: 85, rw: 43 },
-  bored:      { lh: 30, rh: 30, ltl: 20, ltr: 20, rtl: 20, rtr: 20, ly: 8, ry: 8 },
+  attentive:  { lrot: 3, rrot: -5, lh: 190, rh: 190 },
+  worried:    { lw: 75, lh: 140, rw: 75, rh: 140, ltl: 20, ltr: 25, rtl: 25, rtr: 20, lbl: 35, lbr: 35, rbl: 35, rbr: 35 },
+  curious:    { lw: 110, lh: 220, rw: 85, rh: 170, lrot: -8, rrot: 12, ltl: 50, lbl: 35, rtl: 30, rtr: 40, headTilt: 8 },
+  happy:      { lh: 150, rh: 150, ltl: 30, ltr: 30, rtl: 30, rtr: 30, lbl: 50, lbr: 50, rbl: 50, rbr: 50 },
+  sleepy:     { lh: 40, rh: 40, lw: 120, rw: 120, ltl: 15, ltr: 15, rtl: 15, rtr: 15, lbl: 15, lbr: 15, rbl: 15, rbr: 15, ly: 10, ry: 10 },
+  sad:        { lh: 170, rh: 170, ltl: 15, ltr: 30, rtl: 30, rtr: 15, lbl: 50, lbr: 40, rbl: 40, rbr: 50, lrot: 10, rrot: -10, ly: 10, ry: 10 },
+  silly:      { lw: 105, lh: 185, rw: 95, rh: 160, ltl: 50, ltr: 30, rtl: 35, rtr: 50, lbl: 30, lbr: 50, rbl: 50, rbr: 30, lrot: 12, rrot: -8 },
+  angry:      { lh: 120, rh: 120, lw: 110, rw: 110, ltl: 8, ltr: 30, rtl: 30, rtr: 8, lbl: 35, lbr: 35, rbl: 35, rbr: 35, lrot: -15, rrot: 15 },
+  excited:    { lw: 120, lh: 230, rw: 120, rh: 230, gap: 440 },
+  surprise:   { lw: 130, lh: 240, rw: 130, rh: 240, gap: 460 },
+  scared:     { lw: 115, lh: 250, rw: 115, rh: 250, gap: 480 },
+  love:       { lh: 160, rh: 160, lw: 110, rw: 110, lrot: 8, rrot: -8 },
+  suspicious: { lh: 60, rh: 70, lw: 115, rw: 110, ltl: 8, ltr: 15, rtl: 15, rtr: 8, lbl: 15, lbr: 8, rbl: 8, rbr: 15, lrot: -3, rrot: 5 },
+  thinking:   { lw: 85, lh: 170, rw: 100, rh: 205, lrot: 0, rrot: 5, headTilt: 10, gazeX: 0.5, gazeY: -0.3 },
+  determined: { lh: 130, rh: 130, lw: 105, rw: 105, ltl: 8, ltr: 25, rtl: 25, rtr: 8, lbl: 30, lbr: 30, rbl: 30, rbr: 30, lrot: -8, rrot: 8 },
+  wink:       { lh: 20, lw: 100, ltl: 8, ltr: 8, lbl: 8, lbr: 8, rh: 210, rw: 105 },
+  bored:      { lh: 70, rh: 70, ltl: 20, ltr: 20, rtl: 20, rtr: 20, ly: 16, ry: 16 },
 };
 
 // ══════════════════════════════════════════
@@ -235,7 +247,7 @@ function resize() {
   W = r.width || 600; H = r.height || 400;
   c.width = W * d; c.height = H * d;
   x.setTransform(d, 0, 0, d, 0, 0);
-  cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 280;
+  cx = W / 2; cy = H / 2; sc = Math.min(W, H) / 560;
 }
 
 // ── Blink system ──
@@ -334,26 +346,33 @@ function draw() {
   const blinkR = getBlinkScale(true);
 
   // Left eye
-  drawEye(-gap, S.lw, S.lh, S.ltl, S.ltr, S.lbr, S.lbl, S.lrot, S.lx, S.ly, S.lskewX, S.lskewY, gx, gy, blinkL);
+  drawEye(-gap, S.lw, S.lh, S.ltl, S.ltr, S.lbr, S.lbl, S.lrot, S.lx, S.ly, S.lskewX, S.lskewY, gx, gy, blinkL, S.lshiftTop, S.lshiftBot);
 
-  // Right eye
+  // Right eye — mirror negates shifts
   if (mir) {
-    drawEye(gap, S.lw, S.lh, S.ltr, S.ltl, S.lbl, S.lbr, -S.lrot, -S.lx, S.ly, -S.lskewX, -S.lskewY, gx, gy, blinkR);
+    drawEye(gap, S.lw, S.lh, S.ltr, S.ltl, S.lbl, S.lbr, -S.lrot, -S.lx, S.ly, -S.lskewX, -S.lskewY, gx, gy, blinkR, -S.lshiftTop, -S.lshiftBot);
   } else {
-    drawEye(gap, S.rw, S.rh, S.rtl, S.rtr, S.rbr, S.rbl, S.rrot, S.rx, S.ry, S.rskewX, S.rskewY, gx, gy, blinkR);
+    drawEye(gap, S.rw, S.rh, S.rtl, S.rtr, S.rbr, S.rbl, S.rrot, S.rx, S.ry, S.rskewX, S.rskewY, gx, gy, blinkR, S.rshiftTop, S.rshiftBot);
   }
 
   x.restore();
   requestAnimationFrame(draw);
 }
 
-function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, blinkScale) {
+function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, blinkScale, shiftTop, shiftBot) {
   const ew = w * sc / 2;
-  const eh = Math.max(1.5 * sc, h * sc / 2 * (blinkScale || 1));
-  const ctl = Math.min(tl, w, h) * sc / 2;
-  const ctr = Math.min(tr, w, h) * sc / 2;
-  const cbr = Math.min(br, w, h) * sc / 2;
-  const cbl = Math.min(bl, w, h) * sc / 2;
+  const rawEh = h * sc / 2;
+  // Skip blink when eyes already nearly closed (sleeping)
+  const eyeTiny = rawEh < 8 * sc;
+  const bs = eyeTiny ? 1 : (blinkScale || 1);
+  const eh = Math.max(1.5 * sc, rawEh * bs);
+  const st = (shiftTop || 0) * sc / 2;
+  const sb = (shiftBot || 0) * sc / 2;
+  // Clamp radii against rendered half-dimensions
+  const ctl = Math.min(tl * sc, ew, eh);
+  const ctr = Math.min(tr * sc, ew, eh);
+  const cbr = Math.min(br * sc, ew, eh);
+  const cbl = Math.min(bl * sc, ew, eh);
 
   x.save();
   x.translate(baseX + ox * sc + gx, (oy) * sc + gy);
@@ -364,8 +383,8 @@ function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, bli
 
   x.fillStyle = '#d7d0c8';
 
-  // If nearly closed — draw a line instead
-  if (blinkScale !== undefined && blinkScale < 0.12) {
+  // Eyes too thin for pill — draw a line (blink or squished expression)
+  if ((!eyeTiny && blinkScale !== undefined && blinkScale < 0.12) || eh < ew * 0.15) {
     x.strokeStyle = '#d7d0c8';
     x.lineWidth = 2.5 * sc;
     x.lineCap = 'round';
@@ -378,22 +397,11 @@ function drawEye(baseX, w, h, tl, tr, br, bl, rot, ox, oy, skX, skY, gx, gy, bli
   }
 
   x.beginPath();
-
-  // Top-left corner
-  x.moveTo(-ew + ctl, -eh);
-  // Top edge → top-right corner
-  x.lineTo(ew - ctr, -eh);
-  x.quadraticCurveTo(ew, -eh, ew, -eh + ctr);
-  // Right edge → bottom-right corner
-  x.lineTo(ew, eh - cbr);
-  x.quadraticCurveTo(ew, eh, ew - cbr, eh);
-  // Bottom edge → bottom-left corner
-  x.lineTo(-ew + cbl, eh);
-  x.quadraticCurveTo(-ew, eh, -ew, eh - cbl);
-  // Left edge → top-left corner
-  x.lineTo(-ew, -eh + ctl);
-  x.quadraticCurveTo(-ew, -eh, -ew + ctl, -eh);
-
+  x.moveTo(st, -eh);
+  x.arcTo( ew + st, -eh,  ew + sb,  eh, ctr);
+  x.arcTo( ew + sb,  eh, -ew + sb,  eh, cbr);
+  x.arcTo(-ew + sb,  eh, -ew + st, -eh, cbl);
+  x.arcTo(-ew + st, -eh,  ew + st, -eh, ctl);
   x.closePath();
   x.fill();
   x.restore();
@@ -459,10 +467,43 @@ function resetAll() {
 }
 
 function copyJSON() {
-  const diff = {};
-  Object.keys(S).forEach(k => { if (S[k] !== D[k]) diff[k] = S[k]; });
-  const j = JSON.stringify(diff, null, 2);
-  navigator.clipboard.writeText(j).then(() => { document.getElementById('out').textContent = 'Copied!\n' + j; });
+  // Export as expressions.js format
+  const mir = document.getElementById('mirror').checked;
+  const mapEye = (prefix) => {
+    const e = {};
+    const pk = (k) => S[prefix + k];
+    if (pk('w') !== D[prefix+'w']) e.w = pk('w');
+    if (pk('h') !== D[prefix+'h']) e.h = pk('h');
+    if (pk('tl') !== D[prefix+'tl']) e.tl = pk('tl');
+    if (pk('tr') !== D[prefix+'tr']) e.tr = pk('tr');
+    if (pk('bl') !== D[prefix+'bl']) e.bl = pk('bl');
+    if (pk('br') !== D[prefix+'br']) e.br = pk('br');
+    if (pk('shiftTop') !== D[prefix+'shiftTop']) e.shiftTop = pk('shiftTop');
+    if (pk('shiftBot') !== D[prefix+'shiftBot']) e.shiftBot = pk('shiftBot');
+    if (pk('rot') !== D[prefix+'rot']) e.tilt = pk('rot');
+    if (pk('x') !== D[prefix+'x']) e.x = pk('x');
+    if (pk('y') !== D[prefix+'y']) e.y = pk('y');
+    return Object.keys(e).length ? e : null;
+  };
+
+  const left = mapEye('l');
+  const right = mir ? null : mapEye('r');
+  const face = {};
+  if (S.headTilt !== D.headTilt) face.tilt = S.headTilt;
+  if (S.headX !== D.headX) face.x = S.headX;
+  if (S.headY !== D.headY) face.y = S.headY;
+  if (S.headScale !== D.headScale) face.scale = S.headScale;
+
+  let out = '';
+  if (mir && left) {
+    out = `sym(\n  ${JSON.stringify(left)},\n  { /* mouth */ },\n  ${Object.keys(face).length ? JSON.stringify(face) : '{}'}${S.gap !== D.gap ? ',\n  ' + S.gap : ''}\n)`;
+  } else if (left || right) {
+    out = `asym(\n  ${JSON.stringify(left || {})},\n  ${JSON.stringify(right || {})},\n  { /* mouth */ },\n  ${Object.keys(face).length ? JSON.stringify(face) : '{}'}${S.gap !== D.gap ? ',\n  ' + S.gap : ''}\n)`;
+  } else {
+    out = `sym({}, {}, {})`;
+  }
+
+  navigator.clipboard.writeText(out).then(() => { document.getElementById('out').textContent = 'Copied!\n' + out; });
 }
 
 // Init

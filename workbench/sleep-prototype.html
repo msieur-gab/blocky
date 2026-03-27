@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ami.b — Sleep Animation Prototype</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a1f;
+  color: #ccc;
+  font: 13px/1.5 -apple-system, 'Segoe UI', sans-serif;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  height: 100vh;
+}
+#preview { display: flex; align-items: center; justify-content: center; background: #0a0a0f; }
+canvas { width: 100%; height: 100%; }
+#controls {
+  background: #222228;
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid #333;
+}
+h2 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #666;
+  margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #333;
+}
+h2:first-child { margin-top: 0; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.row label { width: 90px; font-size: 12px; color: #888; flex-shrink: 0; }
+.row input[type="range"] { flex: 1; height: 4px; accent-color: #6b8afd; cursor: pointer; }
+.row .v { width: 44px; text-align: right; font-size: 12px; font-weight: 600; color: #6b8afd; }
+.btn-row { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.btn-row button {
+  padding: 6px 12px; font-size: 11px; font-family: inherit;
+  background: #333; color: #ccc; border: 1px solid #444; border-radius: 5px; cursor: pointer;
+}
+.btn-row button:hover { border-color: #6b8afd; color: #6b8afd; }
+.btn-row button.on { background: #6b8afd; color: #fff; border-color: #6b8afd; }
+.toggle { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.toggle label { font-size: 12px; color: #888; }
+.toggle input { width: 14px; height: 14px; }
+#status {
+  margin: 8px 0;
+  padding: 8px;
+  background: #1a1a1f;
+  border-radius: 4px;
+  font: 11px/1.4 'SF Mono', monospace;
+  color: #6b8afd;
+  min-height: 60px;
+}
+.section { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div id="preview"><canvas id="c"></canvas></div>
+
+<div id="controls">
+
+  <h2>Animation</h2>
+  <div class="btn-row">
+    <button onclick="playSequence('greet')">Greet</button>
+    <button onclick="playSequence('calm')">Calm</button>
+    <button onclick="playSequence('drowsy')">Drowsy</button>
+    <button onclick="playSequence('fallAsleep')">Fall Asleep</button>
+    <button onclick="playSequence('sleeping')">Sleep Loop</button>
+    <button onclick="playSequence('wakeUp')">Wake Up</button>
+  </div>
+  <h2>Head Gestures (overlay)</h2>
+  <div class="btn-row">
+    <button onclick="playGesture('nod')">Yes (nod)</button>
+    <button onclick="playGesture('shake')">No (shake)</button>
+  </div>
+  <h2>Symbol Behaviors</h2>
+  <div class="btn-row">
+    <button onclick="playSequence('starry')">Stars</button>
+    <button onclick="playSequence('love')">Heart</button>
+    <button onclick="playSequence('dizzy')">Dizzy</button>
+  </div>
+  <div id="status">Ready — click a state above</div>
+
+  <h2>Breathing Method</h2>
+  <div class="toggle">
+    <input type="radio" name="breathMethod" id="bm-scale" checked>
+    <label for="bm-scale">Face scale (whole head grows/shrinks)</label>
+  </div>
+  <div class="toggle">
+    <input type="radio" name="breathMethod" id="bm-gap">
+    <label for="bm-gap">Eye gap (distance between eyes changes)</label>
+  </div>
+  <div class="toggle">
+    <input type="radio" name="breathMethod" id="bm-y">
+    <label for="bm-y">Face Y (head bobs up/down)</label>
+  </div>
+  <div class="toggle">
+    <input type="radio" name="breathMethod" id="bm-combined">
+    <label for="bm-combined">Combined (scale + Y + subtle gap)</label>
+  </div>
+
+  <h2>Sleep Breathing</h2>
+  <div id="sl-breath"></div>
+
+  <h2>Eye Expression (current)</h2>
+  <div id="sl-eye"></div>
+
+  <h2>Face / Head</h2>
+  <div id="sl-face"></div>
+
+  <h2>Timing</h2>
+  <div id="sl-timing"></div>
+
+</div>
+
+<script type="module">
+import { catalog as EYES, DEFAULT as EYE_DEFAULT } from './proto/eyes.js';
+import { play as playSound, init as initSound } from './proto/sounds.js';
+import { catalog as BEHAVIORS } from './proto/behaviors.js';
+import { catalog as CHAINS } from './proto/chains.js';
+import { catalog as GESTURES } from './proto/gestures.js';
+import { catalog as MOUTHS, DEFAULT as MOUTH_DEFAULT } from './proto/mouths.js';
+
+function ensureAudio() { initSound(); }
+
+// ══════════════════════════════════════════
+// State
+// ══════════════════════════════════════════
+
+const FACE_DEFAULT = { x: 0, y: 0, scale: 1, tilt: 0, squash: 0 };
+
+const state = {
+  left:  { ...EYE_DEFAULT },
+  right: { ...EYE_DEFAULT },
+  mouth: { ...MOUTH_DEFAULT },
+  face:  { ...FACE_DEFAULT },
+  gap: 400,
+};
+
+const target = {
+  left:  { ...EYE_DEFAULT },
+  right: { ...EYE_DEFAULT },
+  mouth: { ...MOUTH_DEFAULT },
+  face:  { ...FACE_DEFAULT },
+  gap: 400,
+};
+
+// Animation basics
+let driftPhase = Math.random() * 100;
+let blinkAmt = 0, blinkPhase = 0, blinkTimer = 2 + Math.random() * 3;
+let blinksLeft = 0, blinkPause = 0;
+let gazeX = 0, gazeY = 0, gazeTargetX = 0, gazeTargetY = 0, gazeTimer = 0;
+
+// Behavior player state
+let currentBehavior = null;  // active behavior object
+let behaviorLoop = null;     // internal loop frames (if any)
+let loopIndex = 0;
+let loopTimer = 0;
+
+// Chain player state
+let chain = null;
+let chainIndex = 0;
+let chainTimer = 0;
+
+// Breathing parameters (for UI experimentation)
+const breathP = {
+  speed: 0.4,
+  scaleAmt: 0.03,
+  gapAmt: 15,
+  yAmt: 4,
+};
+let breathPhase = 0;
+
+// Timing
+const timing = {
+  eyeSpeed: 3,
+  faceSpeed: 6,
+};
+
+// ══════════════════════════════════════════
+// Canvas
+// ══════════════════════════════════════════
+
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let W, H, cx, cy, sc;
+
+function resize() {
+  const d = devicePixelRatio || 1;
+  const r = c.parentElement.getBoundingClientRect();
+  W = r.width; H = r.height;
+  c.width = W * d; c.height = H * d;
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  cx = W / 2; cy = H / 2;
+  sc = Math.min(W, H) / 560;
+}
+
+// ══════════════════════════════════════════
+// Interpolation
+// ══════════════════════════════════════════
+
+function clamp(v, mn, mx) { return v < mn ? mn : v > mx ? mx : v; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function easedFactor(speed, dt) {
+  const t = clamp(speed * dt, 0, 1);
+  return 1 - (1 - t) * (1 - t) * (1 - t);
+}
+
+function lerpObj(current, tgt, speed, dt) {
+  const f = easedFactor(speed, dt);
+  for (const k in tgt) {
+    if (typeof tgt[k] === 'number' && typeof current[k] === 'number') {
+      current[k] = lerp(current[k], tgt[k], f);
+    } else {
+      current[k] = tgt[k]; // strings, nulls — snap
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+// Mirror eye for right side
+// ══════════════════════════════════════════
+
+function mirrorEye(eye) {
+  return {
+    ...eye,
+    tl: eye.tr, tr: eye.tl,
+    bl: eye.br, br: eye.bl,
+    tilt: -(eye.tilt || 0),
+    shiftTop: -(eye.shiftTop || 0),
+    shiftBot: -(eye.shiftBot || 0),
+    x: -(eye.x || 0),
+  };
+}
+
+// ══════════════════════════════════════════
+// Set expression target
+// ══════════════════════════════════════════
+
+function setEyes(name) {
+  const e = EYES[name];
+  if (!e) return;
+  Object.assign(target.left, e);
+  Object.assign(target.right, mirrorEye(e));
+}
+
+function setMouth(name) {
+  const m = MOUTHS[name];
+  if (!m) return;
+  Object.assign(target.mouth, m);
+}
+
+function setFace(f) {
+  Object.assign(target.face, FACE_DEFAULT, f);
+}
+
+// ══════════════════════════════════════════
+// Sequences
+// ══════════════════════════════════════════
+
+// ══════════════════════════════════════════
+// Behavior Player
+// Enters a behavior, plays its internal loop if any
+// ══════════════════════════════════════════
+
+function enterBehavior(name) {
+  const b = BEHAVIORS[name];
+  if (!b) return;
+  currentBehavior = b;
+
+  // Set base eyes, mouth, and face
+  setEyes(b.eyes);
+  setMouth(b.mouth || 'none');
+  if (b.face) setFace(b.face);
+  if (b.sound) playSound(b.sound);
+
+  // Start internal loop if defined
+  if (b.loop) {
+    behaviorLoop = b.loop;
+    loopIndex = 0;
+    loopTimer = 0;
+    applyLoopFrame(behaviorLoop[0]);
+  } else {
+    behaviorLoop = null;
+  }
+
+  updateStatus(name);
+}
+
+function applyLoopFrame(frame) {
+  if (frame.eyes) setEyes(frame.eyes);
+  if (frame.mouth) setMouth(frame.mouth);
+  if (frame.face) setFace(frame.face);
+  if (frame.sound) playSound(frame.sound);
+}
+
+function updateBehavior(dt) {
+  if (!behaviorLoop) return;
+
+  loopTimer += dt * 1000;
+  const frame = behaviorLoop[loopIndex];
+
+  if (loopTimer >= frame.dur) {
+    loopTimer = 0;
+    loopIndex = (loopIndex + 1) % behaviorLoop.length;
+    applyLoopFrame(behaviorLoop[loopIndex]);
+  }
+
+  // If behavior uses breathing method selector, apply face breathing
+  if (currentBehavior && currentBehavior.breathMethod) {
+    applyBreathMethod(dt);
+  }
+}
+
+// ══════════════════════════════════════════
+// Head Gestures — face-only overlay
+// Plays on TOP of current behavior without interrupting it
+// ══════════════════════════════════════════
+
+let gesture = null;
+let gestureIndex = 0;
+let gestureTimer = 0;
+let gestureFaceOffset = { x: 0, y: 0, tilt: 0, scale: 0, skewX: 0 };
+
+function playGestureByName(name) {
+  ensureAudio();
+  const g = GESTURES[name];
+  if (!g) return;
+  gesture = g;
+  gestureIndex = 0;
+  gestureTimer = 0;
+  applyGestureFrame(g[0]);
+}
+
+function applyGestureFrame(frame) {
+  gestureFaceOffset.x = frame.x || 0;
+  gestureFaceOffset.y = frame.y || 0;
+  gestureFaceOffset.tilt = frame.tilt || 0;
+  gestureFaceOffset.scale = frame.scale || 0;
+  gestureFaceOffset.skewX = frame.skewX || 0;
+  if (frame.sound) playSound(frame.sound);
+}
+
+function updateGesture(dt) {
+  if (!gesture) {
+    // Ease offset back to zero when no gesture
+    gestureFaceOffset.x *= 0.85;
+    gestureFaceOffset.y *= 0.85;
+    gestureFaceOffset.tilt *= 0.85;
+    gestureFaceOffset.scale *= 0.85;
+    gestureFaceOffset.skewX *= 0.85;
+    return;
+  }
+
+  gestureTimer += dt * 1000;
+  const frame = gesture[gestureIndex];
+
+  if (gestureTimer >= frame.dur) {
+    gestureTimer = 0;
+    gestureIndex++;
+    if (gestureIndex >= gesture.length) {
+      gesture = null;
+      return;
+    }
+    applyGestureFrame(gesture[gestureIndex]);
+  }
+}
+
+window.playGesture = playGestureByName;
+
+// ══════════════════════════════════════════
+// Chain Player
+// Steps through a sequence of behaviors
+// ══════════════════════════════════════════
+
+// ── Chain/Mode state ──
+let activeMode = null;     // current mode object (if playing a mode)
+let chainPhase = 'none';   // 'none' | 'intro' | 'hold' | 'outro'
+let pendingChain = null;   // queued chain to play after outro finishes
+
+function playChain(name) {
+  ensureAudio();
+  const entry = CHAINS[name];
+
+  if (!entry) {
+    // Not a chain — try as a single behavior
+    if (BEHAVIORS[name]) {
+      interruptCurrent();
+      chain = null;
+      activeMode = null;
+      chainPhase = 'none';
+      enterBehavior(name);
+    }
+    return;
+  }
+
+  // Is it a mode (has intro/hold/outro) or simple (has steps)?
+  if (entry.steps) {
+    // Simple reaction — interrupt and play
+    interruptCurrent();
+    chain = entry.steps;
+    activeMode = null;
+    chainPhase = 'none';
+    chainIndex = 0;
+    chainTimer = 0;
+    enterBehavior(chain[0].behavior);
+  } else if (entry.intro) {
+    // Mode — if currently in a mode's hold, play outro first
+    if (chainPhase === 'hold' && activeMode && activeMode.outro) {
+      pendingChain = name;
+      chain = activeMode.outro;
+      chainPhase = 'outro';
+      chainIndex = 0;
+      chainTimer = 0;
+      enterBehavior(chain[0].behavior);
+    } else {
+      interruptCurrent();
+      activeMode = entry;
+      chain = entry.intro;
+      chainPhase = 'intro';
+      chainIndex = 0;
+      chainTimer = 0;
+      enterBehavior(chain[0].behavior);
+    }
+  }
+}
+
+function interruptCurrent() {
+  // If in a hold state with outro, play outro
+  if (chainPhase === 'hold' && activeMode && activeMode.outro) {
+    // outro will be handled by the caller
+    return;
+  }
+  chain = null;
+  activeMode = null;
+  chainPhase = 'none';
+  behaviorLoop = null;
+}
+
+function updateChain(dt) {
+  if (!chain) return;
+
+  const step = chain[chainIndex];
+  if (!step.dur) {
+    // Terminal step
+    if (chainPhase === 'intro' && activeMode && activeMode.hold) {
+      // Intro done → enter hold behavior
+      chainPhase = 'hold';
+      chain = null;
+      enterBehavior(activeMode.hold);
+      return;
+    }
+    if (chainPhase === 'outro') {
+      // Outro done → play pending chain or return to calm
+      chainPhase = 'none';
+      chain = null;
+      activeMode = null;
+      if (pendingChain) {
+        const next = pendingChain;
+        pendingChain = null;
+        playChain(next);
+      } else {
+        enterBehavior('calm');
+      }
+      return;
+    }
+    // Simple reaction terminal — return to calm
+    chain = null;
+    enterBehavior('calm');
+    return;
+  }
+
+  chainTimer += dt * 1000;
+  if (chainTimer >= step.dur) {
+    chainTimer = 0;
+    chainIndex++;
+    if (chainIndex >= chain.length) {
+      // End of steps
+      if (chainPhase === 'intro' && activeMode && activeMode.hold) {
+        chainPhase = 'hold';
+        chain = null;
+        enterBehavior(activeMode.hold);
+      } else if (chainPhase === 'outro') {
+        chainPhase = 'none';
+        chain = null;
+        activeMode = null;
+        if (pendingChain) {
+          const next = pendingChain;
+          pendingChain = null;
+          playChain(next);
+        } else {
+          enterBehavior('calm');
+        }
+      } else {
+        // Simple reaction done
+        chain = null;
+        enterBehavior('calm');
+      }
+      return;
+    }
+    enterBehavior(chain[chainIndex].behavior);
+  }
+}
+
+// ══════════════════════════════════════════
+// Breathing face effect (experimental)
+// ══════════════════════════════════════════
+
+function applyBreathMethod(dt) {
+  breathPhase += dt * breathP.speed * Math.PI * 2;
+  const b = Math.sin(breathPhase);
+
+  const method = document.querySelector('input[name="breathMethod"]:checked').id;
+  // Get base face from current behavior
+  const base = currentBehavior?.face || {};
+  const baseY = base.y || 0;
+  const baseScale = base.scale || 1;
+
+  switch (method) {
+    case 'bm-scale':
+      target.face.scale = baseScale + b * breathP.scaleAmt;
+      break;
+    case 'bm-gap':
+      target.gap = 400 + b * breathP.gapAmt;
+      break;
+    case 'bm-y':
+      target.face.y = baseY + b * breathP.yAmt;
+      break;
+    case 'bm-combined':
+      target.face.scale = baseScale + b * breathP.scaleAmt * 0.6;
+      target.face.y = baseY + b * breathP.yAmt * 0.5;
+      target.gap = 400 + b * breathP.gapAmt * 0.4;
+      break;
+  }
+}
+
+// Interrupt current mode — triggers outro if one exists
+function interrupt() {
+  if (chainPhase === 'hold' && activeMode && activeMode.outro) {
+    chain = activeMode.outro;
+    chainPhase = 'outro';
+    chainIndex = 0;
+    chainTimer = 0;
+    enterBehavior(chain[0].behavior);
+    return true;
+  }
+  return false;
+}
+
+// Make available to onclick
+window.playSequence = function(name) {
+  ensureAudio();
+
+  // "Wake Up" = interrupt current mode (play outro)
+  if (name === 'wakeUp') {
+    if (!interrupt()) {
+      // Not in a mode — just go to calm
+      enterBehavior('calm');
+    }
+    return;
+  }
+
+  // Starting a new chain while in hold → interrupt first
+  if (chainPhase === 'hold' && activeMode && activeMode.outro) {
+    pendingChain = name;
+    interrupt();
+    return;
+  }
+
+  playChain(name);
+};
+
+// ══════════════════════════════════════════
+// Blink
+// ══════════════════════════════════════════
+
+function updateBlink(dt) {
+  // Skip blink if eyes already tiny (sleeping)
+  if (state.left.h < 50) return;
+
+  if (blinkPhase === 0) {
+    if (blinkPause > 0) {
+      blinkPause -= dt;
+      if (blinkPause <= 0) blinkPhase = 1;
+    } else {
+      blinkTimer -= dt;
+      if (blinkTimer <= 0) {
+        blinksLeft = Math.random() < 0.3 ? 2 : 1;
+        blinkPhase = 1;
+      }
+    }
+  }
+  const spd = blinksLeft > 1 ? 28 : 16;
+  const ospd = blinksLeft > 1 ? 22 : 12;
+  if (blinkPhase === 1) {
+    blinkAmt = Math.min(1, blinkAmt + dt * spd);
+    if (blinkAmt >= 1) blinkPhase = 2;
+  } else if (blinkPhase === 2) {
+    blinkAmt = Math.max(0, blinkAmt - dt * ospd);
+    if (blinkAmt <= 0) {
+      blinkAmt = 0; blinkPhase = 0;
+      blinksLeft--;
+      if (blinksLeft > 0) blinkPause = 0.04 + Math.random() * 0.03;
+      else blinkTimer = 2 + Math.random() * 4;
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+// Gaze
+// ══════════════════════════════════════════
+
+function updateGaze(dt) {
+  gazeTimer -= dt;
+  if (gazeTimer <= 0) {
+    const isSleeping = currentBehavior === BEHAVIORS.sleeping || currentBehavior === BEHAVIORS.asleep;
+    gazeTargetX = (Math.random() - 0.5) * (isSleeping ? 0.3 : 1.4);
+    gazeTargetY = (Math.random() - 0.5) * (isSleeping ? 0.2 : 0.8);
+    gazeTimer = 2 + Math.random() * 3;
+  }
+  gazeX = lerp(gazeX, gazeTargetX, 1.5 * dt);
+  gazeY = lerp(gazeY, gazeTargetY, 1.5 * dt);
+}
+
+// ══════════════════════════════════════════
+// Draw
+// ══════════════════════════════════════════
+
+function drawEye(side, eye, gap, faceSkewX) {
+  const perspScale = 1;
+  const ew = eye.w * sc / 2;
+  let eh = eye.h * sc / 2;
+
+  // Blink
+  const eyeTiny = eh < 8 * sc;
+  const bs = eyeTiny ? 1 : (1 - blinkAmt * 0.92);
+  eh = Math.max(1.5 * sc, eh * bs);
+
+  // Micro-drift
+  const dSeed = side * 1.7;
+  const microX = Math.sin(driftPhase * 2.3 + dSeed) * 1.5 * sc
+                + Math.sin(driftPhase * 5.1 + dSeed * 3) * 0.6 * sc;
+  const microY = Math.sin(driftPhase * 1.9 + dSeed * 2) * 1.0 * sc
+                + Math.cos(driftPhase * 4.3 + dSeed) * 0.4 * sc;
+
+  const gx = gazeX * 10 * sc;
+  const gy = gazeY * 5 * sc;
+
+  const ex = side * gap * sc / 2 + (eye.x || 0) * sc + microX + gx;
+  const ey = (eye.y || 0) * sc + microY + gy;
+  const tilt = (eye.tilt || 0) * Math.PI / 180;
+
+  ctx.save();
+  ctx.translate(ex, ey);
+  ctx.rotate(tilt);
+
+  ctx.fillStyle = '#d7d0c8';
+  ctx.strokeStyle = '#d7d0c8';
+  ctx.lineWidth = 3 * sc;
+  ctx.lineCap = 'round';
+
+  if ((!eyeTiny && bs < 0.12) || eh < ew * 0.15) {
+    ctx.beginPath();
+    ctx.moveTo(-ew * 0.75, 0);
+    ctx.lineTo(ew * 0.75, 0);
+    ctx.stroke();
+  } else if (eye.shape) {
+    // Symbol shape — bypass pill
+    drawSymbol(ctx, eye.shape, ew, eh);
+  } else {
+    const st = (eye.shiftTop || 0) * sc / 2;
+    const sb = (eye.shiftBot || 0) * sc / 2;
+    const ctl = Math.min((eye.tl ?? 50) * sc, ew, eh);
+    const ctr = Math.min((eye.tr ?? 50) * sc, ew, eh);
+    const cbr = Math.min((eye.br ?? 50) * sc, ew, eh);
+    const cbl = Math.min((eye.bl ?? 50) * sc, ew, eh);
+
+    ctx.beginPath();
+    ctx.moveTo(st, -eh);
+    ctx.arcTo( ew + st, -eh,  ew + sb,  eh, ctr);
+    ctx.arcTo( ew + sb,  eh, -ew + sb,  eh, cbr);
+    ctx.arcTo(-ew + sb,  eh, -ew + st, -eh, cbl);
+    ctx.arcTo(-ew + st, -eh,  ew + st, -eh, ctl);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ── Symbol shapes ──
+
+function drawSymbol(c, shape, w, h) {
+  const r = Math.min(w, h);
+  switch (shape) {
+    case 'star': {
+      const inner = r * 0.45;
+      c.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const angle = (i * Math.PI / 5) - Math.PI / 2;
+        const rad = i % 2 === 0 ? r : inner;
+        const x = Math.cos(angle) * rad;
+        const y = Math.sin(angle) * rad;
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.closePath();
+      c.fill();
+      break;
+    }
+    case 'heart': {
+      c.beginPath();
+      c.moveTo(0, r * 0.3);
+      c.bezierCurveTo(-r * 0.1, -r * 0.1, -r, -r * 0.1, -r * 0.5, -r * 0.6);
+      c.bezierCurveTo(-r * 0.2, -r * 0.9, 0, -r * 0.7, 0, -r * 0.35);
+      c.bezierCurveTo(0, -r * 0.7, r * 0.2, -r * 0.9, r * 0.5, -r * 0.6);
+      c.bezierCurveTo(r, -r * 0.1, r * 0.1, -r * 0.1, 0, r * 0.3);
+      c.closePath();
+      c.fill();
+      break;
+    }
+    case 'musicNote': {
+      const nr = r * 0.4;
+      c.beginPath();
+      c.ellipse(-nr * 0.2, nr * 0.3, nr, nr * 0.7, -0.3, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.moveTo(nr * 0.7, nr * 0.1);
+      c.lineTo(nr * 0.7, -h * 0.9);
+      c.stroke();
+      c.beginPath();
+      c.moveTo(nr * 0.7, -h * 0.9);
+      c.quadraticCurveTo(nr * 1.6, -h * 0.5, nr * 0.7, -h * 0.2);
+      c.stroke();
+      break;
+    }
+    case 'whirl': {
+      c.beginPath();
+      const steps = 60;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const angle = t * 2.5 * Math.PI * 2;
+        const rad = t * r;
+        if (i === 0) c.moveTo(0, 0); else c.lineTo(Math.cos(angle) * rad, Math.sin(angle) * rad);
+      }
+      c.stroke();
+      break;
+    }
+  }
+}
+
+// ── Mouth ──
+
+function drawMouth(m) {
+  if (!m || m.show < 0.01) return;
+
+  const mw = m.w * sc / 2;
+  const mh = m.h * sc / 2;
+  const my = (m.y || 55) * sc / 2;
+
+  ctx.save();
+  ctx.translate(0, my);
+  ctx.globalAlpha = m.show;
+  ctx.fillStyle = '#d7d0c8';
+  ctx.strokeStyle = '#d7d0c8';
+  ctx.lineWidth = 2.5 * sc;
+  ctx.lineCap = 'round';
+
+  switch (m.shape) {
+    case 'circle': {
+      const radius = Math.min(mw, mh) * Math.max(0.3, m.open || 1);
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(2, radius), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'smile': {
+      const curve = Math.abs(m.curve || 10);
+      ctx.beginPath();
+      ctx.moveTo(-mw, 0);
+      ctx.quadraticCurveTo(0, curve * sc / 2, mw, 0);
+      ctx.stroke();
+      break;
+    }
+    case 'frown': {
+      const curve = -Math.abs(m.curve || 10);
+      ctx.beginPath();
+      ctx.moveTo(-mw, 0);
+      ctx.quadraticCurveTo(0, curve * sc / 2, mw, 0);
+      ctx.stroke();
+      break;
+    }
+    case 'line': {
+      ctx.beginPath();
+      ctx.moveTo(-mw, 0);
+      ctx.quadraticCurveTo(0, (m.curve || 0) * sc / 2, mw, 0);
+      ctx.stroke();
+      break;
+    }
+    case 'zigzag': {
+      const segments = 5;
+      const segW = (mw * 2) / segments;
+      const amp = mh * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-mw, 0);
+      for (let i = 1; i <= segments; i++) {
+        ctx.lineTo(-mw + i * segW, (i % 2 === 0 ? -amp : amp));
+      }
+      ctx.stroke();
+      break;
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function draw(ts) {
+  const dt = 0.016;
+  driftPhase += dt;
+
+  // Update
+  updateChain(dt);
+  updateBehavior(dt);
+  updateGesture(dt);
+  updateBlink(dt);
+  updateGaze(dt);
+
+  // Interpolate state toward target
+  lerpObj(state.left, target.left, timing.eyeSpeed, dt);
+  lerpObj(state.right, target.right, timing.eyeSpeed, dt);
+  lerpObj(state.mouth, target.mouth, timing.eyeSpeed, dt);
+  lerpObj(state.face, target.face, timing.faceSpeed, dt);
+  state.gap = lerp(state.gap, target.gap, easedFactor(timing.faceSpeed, dt));
+
+  // Breathing (always-on, face level)
+  const isSleepState = currentBehavior === BEHAVIORS.sleeping || currentBehavior === BEHAVIORS.asleep;
+  const awakeBreath = isSleepState ? 0 : Math.sin(driftPhase * 1.2) * 2 * sc;
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Face transform (Layer 3)
+  ctx.save();
+  ctx.translate(
+    cx + (state.face.x + gestureFaceOffset.x) * sc,
+    cy + (state.face.y + gestureFaceOffset.y) * sc + awakeBreath
+  );
+  ctx.rotate((state.face.tilt + gestureFaceOffset.tilt) * Math.PI / 180);
+  const gestureScale = 1 + gestureFaceOffset.scale;
+  const sx = state.face.scale * gestureScale * (1 - state.face.squash * 0.15);
+  const sy = state.face.scale * (1 + state.face.squash * 0.15);
+  ctx.scale(sx, sy);
+
+  // Eyes (Layer 1, positioned by Layer 2 gap)
+  drawEye(-1, state.left, state.gap, 0);
+  drawEye( 1, state.right, state.gap, 0);
+
+  // Mouth
+  drawMouth(state.mouth);
+
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+
+// ══════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════
+
+function updateStatus(msg) {
+  const el = document.getElementById('status');
+  const f = state.face;
+  el.textContent = `State: ${msg}\nFace: scale=${f.scale.toFixed(3)} y=${f.y.toFixed(1)} tilt=${f.tilt.toFixed(1)}\nEye L: h=${state.left.h.toFixed(0)} tl=${state.left.tl.toFixed(0)} shiftTop=${state.left.shiftTop.toFixed(0)}\nGap: ${state.gap.toFixed(0)}`;
+}
+
+function buildSliders(id, defs) {
+  const el = document.getElementById('sl-' + id);
+  el.innerHTML = '';
+  defs.forEach(d => {
+    const div = document.createElement('div');
+    div.className = 'row';
+    const step = d.st || (d.sc ? 1 : 1);
+    div.innerHTML = `<label>${d.l}</label><input type="range" min="${d.mn}" max="${d.mx}" step="${step}" value="${d.sc ? d.val/d.sc : d.val}"><span class="v">${d.sc ? d.val.toFixed(2) : d.val}</span>`;
+    const inp = div.querySelector('input');
+    const v = div.querySelector('.v');
+    inp.oninput = () => {
+      const val = parseFloat(inp.value) * (d.sc || 1);
+      d.ref[d.k] = val;
+      v.textContent = d.sc ? val.toFixed(2) : Math.round(val);
+    };
+    el.appendChild(div);
+  });
+}
+
+// Build UI
+buildSliders('breath', [
+  { l: 'speed', k: 'speed', ref: breathP, val: breathP.speed, mn: 0.1, mx: 1.5, st: 0.05 },
+  { l: 'scale amt', k: 'scaleAmt', ref: breathP, val: breathP.scaleAmt, mn: 0, mx: 0.1, st: 0.005, sc: 1 },
+  { l: 'gap amt', k: 'gapAmt', ref: breathP, val: breathP.gapAmt, mn: 0, mx: 40, st: 1 },
+  { l: 'y amt', k: 'yAmt', ref: breathP, val: breathP.yAmt, mn: 0, mx: 15, st: 0.5 },
+]);
+
+buildSliders('eye', [
+  { l: 'height', k: 'h', ref: target.left, val: target.left.h, mn: 10, mx: 250 },
+  { l: 'TL radius', k: 'tl', ref: target.left, val: target.left.tl, mn: 0, mx: 80 },
+  { l: 'TR radius', k: 'tr', ref: target.left, val: target.left.tr, mn: 0, mx: 80 },
+  { l: 'shiftTop', k: 'shiftTop', ref: target.left, val: target.left.shiftTop, mn: -80, mx: 80 },
+  { l: 'tilt', k: 'tilt', ref: target.left, val: target.left.tilt, mn: -30, mx: 30 },
+]);
+
+buildSliders('face', [
+  { l: 'scale', k: 'scale', ref: target.face, val: target.face.scale, mn: 70, mx: 130, sc: 0.01 },
+  { l: 'y', k: 'y', ref: target.face, val: target.face.y, mn: -30, mx: 30 },
+  { l: 'tilt', k: 'tilt', ref: target.face, val: target.face.tilt, mn: -20, mx: 20 },
+]);
+
+buildSliders('timing', [
+  { l: 'eye speed', k: 'eyeSpeed', ref: timing, val: timing.eyeSpeed, mn: 1, mx: 15, st: 0.5 },
+  { l: 'face speed', k: 'faceSpeed', ref: timing, val: timing.faceSpeed, mn: 1, mx: 15, st: 0.5 },
+]);
+
+// Status update loop
+setInterval(() => {
+  const f = state.face;
+  const s = document.getElementById('status');
+  const bName = currentBehavior ? Object.keys(BEHAVIORS).find(k => BEHAVIORS[k] === currentBehavior) || '?' : 'none';
+  const loopInfo = behaviorLoop ? ` [loop ${loopIndex + 1}/${behaviorLoop.length}]` : '';
+  const phaseInfo = chainPhase !== 'none' ? ` (${chainPhase}${chain ? ' ' + (chainIndex+1) + '/' + chain.length : ''})` : '';
+  s.textContent = `Behavior: ${bName}${loopInfo}${phaseInfo}\nFace: scale=${f.scale.toFixed(3)} y=${f.y.toFixed(1)}\nEye L: h=${state.left.h.toFixed(0)} tl=${state.left.tl.toFixed(0)} shift=${state.left.shiftTop.toFixed(0)} tilt=${state.left.tilt.toFixed(1)}\nGap: ${state.gap.toFixed(0)}`;
+}, 100);
+
+// Init
+window.addEventListener('resize', resize);
+resize();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
