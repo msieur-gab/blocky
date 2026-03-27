@@ -15,7 +15,7 @@ import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
 import * as kernel from './kernel.js';
 import * as faceApi from './face-api.js';
-import * as reactions from './reactions.js'; // legacy reaction library — registers into face-api
+// reactions.js removed — data now in js/data/ catalogs
 
 // ── Skills ──
 import presenceSkill from './skills/presence.js';
@@ -345,6 +345,6 @@ dom.themeToggle.addEventListener('click', () => {
 window.addEventListener('resize', () => faceApi.resize());
 
 faceApi.init(dom.canvas);
-reactions.init(); // registers reaction library into face-api via bus
+// face-api now loads catalogs directly from js/data/
 lastT = performance.now();
 requestAnimationFrame(loop);

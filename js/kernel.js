@@ -32,15 +32,22 @@ let presenceSkill = null;
 function makeContext(skill) {
   return {
     face: {
-      mood:      (name) => faceApi.mood(name),
-      react:     (name) => faceApi.react(name),
-      override:  (expr) => faceApi.override(expr),
-      overrideRaw: (obj) => faceApi.overrideRaw(obj),
-      release:   () => faceApi.releaseOverride(),
-      startScan: () => faceApi.startScan(),
-      stopScan:  () => faceApi.stopScan(),
+      // New API
+      behavior:     (name) => faceApi.behavior(name),
+      chain:        (name) => faceApi.chain(name),
+      head:         (name) => faceApi.head(name),
+      setAmbient:   (name) => faceApi.setAmbient(name),
+      interruptMode:() => faceApi.interruptMode(),
+      // Legacy API (still used by game, radio, time skills)
+      mood:         (name) => faceApi.mood(name),
+      react:        (name) => faceApi.react(name),
+      override:     (expr) => faceApi.override(expr),
+      overrideRaw:  (obj) => faceApi.overrideRaw(obj),
+      release:      () => faceApi.releaseOverride(),
+      startScan:    () => faceApi.startScan(),
+      stopScan:     () => faceApi.stopScan(),
       setRadioMode: (on, auto) => faceApi.setRadioMode(on, auto),
-      isRadioPlaying: () => faceApi.isRadioPlaying(),
+      isRadioPlaying:() => faceApi.isRadioPlaying(),
     },
     voice: {
       play:   (name, dur) => voice.play(name, dur),
@@ -78,7 +85,7 @@ export function register(skill) {
 
   if (skill.id === 'presence') presenceSkill = skill;
 
-  // Register reactions from skill
+  // Legacy: register reactions from skill (no-op in new system)
   if (skill.reactions) faceApi.registerReactions(skill.reactions);
   if (skill.exemplars) nlu.addExemplars(skill.exemplars);
 
@@ -163,14 +170,14 @@ export function init() {
     state.attention = 1;
     state.silenceDuration = 0;
     state.interactionCount++;
-    faceApi.react('face_recognized');
+    faceApi.chain('face_recognized');
   });
 
   bus.on('face:enrolled', ({ name, role }) => {
     state.currentFace = { name, role };
     state.attention = 1;
     state.interactionCount++;
-    faceApi.react('face_enrolled');
+    faceApi.chain('face_enrolled');
   });
 
   bus.on('face:unknown', () => {

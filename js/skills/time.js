@@ -3,7 +3,20 @@
 // Eyes show hour digits then minute digits
 // ══════════════════════════════════════════
 
-import { makeTimeExpression, makeMinuteExpression } from '../expressions.js';
+import { catalog as EYES, DEFAULT as EYE_DEFAULT } from '../data/eyes.js';
+import { DEFAULT as MOUTH_DEFAULT } from '../data/mouths.js';
+
+const DIGITS = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+
+function makeDigitExpression(d1, d0) {
+  return {
+    left:  { ...EYE_DEFAULT, ...EYES[DIGITS[d1]] },
+    right: { ...EYE_DEFAULT, ...EYES[DIGITS[d0]] },
+    mouth: { ...MOUTH_DEFAULT },
+    face:  { x: 0, y: 0, scale: 1.1, tilt: 0, squash: 0, skewX: 0, skewY: 0 },
+    gap: 400,
+  };
+}
 
 let ctx = null;
 
@@ -33,7 +46,7 @@ export default {
 
     // Phase 1: show hours
     ctx.voice.play('chirp_up');
-    ctx.face.overrideRaw(makeTimeExpression(h, m));
+    ctx.face.overrideRaw(makeDigitExpression(Math.floor(h / 10), h % 10));
 
     setTimeout(() => ctx.voice.play('countdown_beep'), 300);
 
@@ -41,7 +54,7 @@ export default {
     setTimeout(() => ctx.face.release(), 1800);
     setTimeout(() => {
       ctx.voice.play('chirp_short');
-      ctx.face.overrideRaw(makeMinuteExpression(m));
+      ctx.face.overrideRaw(makeDigitExpression(Math.floor(m / 10), m % 10));
     }, 2200);
     setTimeout(() => ctx.voice.play('countdown_beep'), 2500);
 

@@ -6,7 +6,17 @@
 
 import { lerp, clamp } from './utils/math.js';
 import { eyes as symbolShapes, mouths as mouthShapes } from './shapes.js';
-import { NEUTRAL, DEFAULT_EYE, DEFAULT_MOUTH, DEFAULT_FACE } from './expressions.js';
+import { DEFAULT as DEFAULT_EYE } from './data/eyes.js';
+import { DEFAULT as DEFAULT_MOUTH } from './data/mouths.js';
+
+const DEFAULT_FACE = { x: 0, y: 0, scale: 1, tilt: 0, squash: 0, skewX: 0, skewY: 0 };
+const NEUTRAL = {
+  eyeGap: 400, gap: 400,
+  leftEye: { ...DEFAULT_EYE }, left: { ...DEFAULT_EYE },
+  rightEye: { ...DEFAULT_EYE }, right: { ...DEFAULT_EYE },
+  mouth: { ...DEFAULT_MOUTH },
+  face: { ...DEFAULT_FACE },
+};
 
 let canvas, ctx;
 let W, H, cx, cy, scale;
@@ -160,9 +170,10 @@ function lerpObj(current, target, speed, dt) {
 export function update(dt, target) {
   // Eased interpolation everywhere — ease-out cubic
   // Eyes/mouth: smooth (6). Face transforms: snappy (12) so nods/shakes land.
-  face.eyeGap = easedLerp(face.eyeGap, target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
-  lerpObj(face.leftEye, target.leftEye, 6, dt);
-  lerpObj(face.rightEye, target.rightEye, 6, dt);
+  // Support both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
+  face.eyeGap = easedLerp(face.eyeGap, target.gap ?? target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
+  lerpObj(face.leftEye, target.left ?? target.leftEye, 6, dt);
+  lerpObj(face.rightEye, target.right ?? target.rightEye, 6, dt);
   lerpObj(face.mouth, target.mouth, 6, dt);
   lerpObj(face.face, target.face, 12, dt);
 
