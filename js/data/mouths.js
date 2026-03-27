@@ -18,8 +18,8 @@ export const catalog = {
   none:          { ...DEFAULT },
 
   // ── Breathing ──
-  sleep_exhale:  { ...DEFAULT, shape: 'circle', show: 1, w: 6,  h: 6,  open: 0.3 },
-  sleep_inhale:  { ...DEFAULT, shape: 'circle', show: 1, w: 14, h: 14, open: 0.8 },
+  sleep_exhale:  { ...DEFAULT, shape: 'circle', show: 1, w: 16, h: 16, open: 0.4 },
+  sleep_inhale:  { ...DEFAULT, shape: 'circle', show: 1, w: 36, h: 36, open: 1 },
 
   // ── Emotions ──
   smile:         { ...DEFAULT, shape: 'smile', show: 1, w: 32, curve: 14 },
