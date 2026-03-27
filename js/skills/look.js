@@ -10,12 +10,12 @@ let timeoutId = null;
 let gestureUnsub = null;
 
 const GESTURE_REACTIONS = {
-  heart:      { reaction: 'love',          mood: 'happy' },
-  thumbsup:   { reaction: 'child_laughed', mood: 'happy' },
-  thumbsdown: { reaction: 'child_sad',     mood: 'sad' },
-  love_sign:  { reaction: 'love',          mood: 'happy' },
-  paper:      { reaction: 'surprised',     mood: 'excited' },
-  point:      { reaction: 'curious_loop',  mood: 'curious' },
+  heart:      { reaction: 'love_reaction',       mood: 'happy' },
+  thumbsup:   { reaction: 'child_laughed',       mood: 'happy' },
+  thumbsdown: { reaction: 'child_sad',           mood: 'sad' },
+  love_sign:  { reaction: 'love_reaction',       mood: 'happy' },
+  paper:      { reaction: 'surprised_reaction',  mood: 'excited' },
+  point:      { reaction: 'curious_loop',        mood: 'curious' },
 };
 
 export default {
@@ -72,7 +72,7 @@ function onGesture({ gesture }) {
     ctx.memory.log({ category: 'gesture', data: { gesture } });
 
     // Wait for reaction to play, then finish
-    setTimeout(() => finish(), 500);
+    setTimeout(() => finish(), 3000);
   }
 }
 
