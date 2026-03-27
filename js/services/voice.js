@@ -81,6 +81,14 @@ export const sounds = {
     tone({ type: 'sine', freq: [220, 187], duration: dur, attack: dur * 0.15 });
   },
 
+  // ── Kiss ──
+
+  kiss(dur = 0.25) {
+    // Quick pop with resonance — like a smoochy kiss
+    noise({ duration: 0.04, volume: 0.6, shape: 'attack', filter: { type: 'bandpass', freq: 2500, Q: 8 } });
+    tone({ type: 'sine', freq: [800, 400], duration: dur, delay: 0.03, attack: 0.01, release: 0.15, volume: 0.4 });
+  },
+
   // ── Pops / clicks ──
 
   pop(dur = 0.08) {

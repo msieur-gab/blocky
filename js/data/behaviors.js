@@ -211,9 +211,9 @@ export const catalog = {
 
   heart_eyes: {
     eyes: 'heart',
-    mouth: 'smile',
+    mouth: 'three',
     face: { scale: 1.04 },
-    sound: 'chirp_up',
+    sound: 'kiss',
   },
 
   musical: {

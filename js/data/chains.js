@@ -33,7 +33,8 @@ export const catalog = {
   love_reaction: {
     steps: [
       { behavior: 'surprise',   dur: 300, sound: 'chirp_up' },
-      { behavior: 'heart_eyes', dur: 2400, sound: 'hum_happy' },
+      { behavior: 'heart_eyes', dur: 1200 },
+      { behavior: 'heart_eyes', dur: 1200, sound: 'kiss' },
       { behavior: 'happy',      dur: 800 },
     ],
   },
