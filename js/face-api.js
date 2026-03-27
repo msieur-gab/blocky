@@ -37,7 +37,7 @@ let loopIndex = 0;
 let loopTimer = 0;
 
 // Chain/mode player
-let chain = null;
+let activeChain = null;
 let chainIndex = 0;
 let chainTimer = 0;
 let activeMode = null;
@@ -106,7 +106,7 @@ function setFace(f) {
 // Behavior player
 // ══════════════════════════════════════════
 
-function enterBehavior(name) {
+function enterBehavior(name, stepOverrides) {
   const b = BEHAVIORS[name];
   if (!b) { console.warn(`[face-api] Unknown behavior: ${name}`); return; }
 
@@ -117,7 +117,11 @@ function enterBehavior(name) {
   setMouth(b.mouth || 'none');
   if (b.face) setFace(b.face);
   if (b.gap !== undefined) target.gap = b.gap;
-  if (b.sound) playSound(b.sound);
+
+  // Step overrides from chain (sound, face)
+  if (stepOverrides?.face) setFace({ ...b.face, ...stepOverrides.face });
+  const sound = stepOverrides?.sound || b.sound;
+  if (sound) playSound(sound);
 
   if (b.loop) {
     behaviorLoop = b.loop;
@@ -168,12 +172,12 @@ function playChain(name) {
 
   if (entry.steps) {
     interruptCurrent();
-    chain = entry.steps;
+    activeChain = entry.steps;
     activeMode = null;
     chainPhase = 'none';
     chainIndex = 0;
     chainTimer = 0;
-    enterBehavior(chain[0].behavior);
+    enterBehavior(activeChain[0].behavior, activeChain[0]);
   } else if (entry.intro) {
     if (chainPhase === 'hold' && activeMode && activeMode.outro) {
       pendingChain = name;
@@ -181,22 +185,22 @@ function playChain(name) {
     } else {
       interruptCurrent();
       activeMode = entry;
-      chain = entry.intro;
+      activeChain = entry.intro;
       chainPhase = 'intro';
       chainIndex = 0;
       chainTimer = 0;
-      enterBehavior(chain[0].behavior);
+      enterBehavior(activeChain[0].behavior, activeChain[0]);
     }
   }
 }
 
 function interrupt() {
   if (chainPhase === 'hold' && activeMode && activeMode.outro) {
-    chain = activeMode.outro;
+    activeChain = activeMode.outro;
     chainPhase = 'outro';
     chainIndex = 0;
     chainTimer = 0;
-    enterBehavior(chain[0].behavior);
+    enterBehavior(activeChain[0].behavior, activeChain[0]);
     return true;
   }
   return false;
@@ -204,20 +208,20 @@ function interrupt() {
 
 function interruptCurrent() {
   if (chainPhase === 'hold' && activeMode && activeMode.outro) return;
-  chain = null;
+  activeChain = null;
   activeMode = null;
   chainPhase = 'none';
   behaviorLoop = null;
 }
 
 function updateChain(dt) {
-  if (!chain) return;
+  if (!activeChain) return;
 
-  const step = chain[chainIndex];
+  const step = activeChain[chainIndex];
   if (!step.dur) {
     if (chainPhase === 'intro' && activeMode && activeMode.hold) {
       chainPhase = 'hold';
-      chain = null;
+      activeChain = null;
       enterBehavior(activeMode.hold);
       return;
     }
@@ -225,7 +229,7 @@ function updateChain(dt) {
       finishOutro();
       return;
     }
-    chain = null;
+    activeChain = null;
     enterBehavior(ambientBehavior);
     return;
   }
@@ -234,27 +238,27 @@ function updateChain(dt) {
   if (chainTimer >= step.dur) {
     chainTimer = 0;
     chainIndex++;
-    if (chainIndex >= chain.length) {
+    if (chainIndex >= activeChain.length) {
       if (chainPhase === 'intro' && activeMode && activeMode.hold) {
         chainPhase = 'hold';
-        chain = null;
+        activeChain = null;
         enterBehavior(activeMode.hold);
       } else if (chainPhase === 'outro') {
         finishOutro();
       } else {
-        chain = null;
+        activeChain = null;
         enterBehavior(ambientBehavior);
         bus.emit('face:chainEnd');
       }
       return;
     }
-    enterBehavior(chain[chainIndex].behavior);
+    enterBehavior(activeChain[chainIndex].behavior, activeChain[chainIndex]);
   }
 }
 
 function finishOutro() {
   chainPhase = 'none';
-  chain = null;
+  activeChain = null;
   activeMode = null;
   if (pendingChain) {
     const next = pendingChain;
@@ -339,16 +343,19 @@ export function override(behaviorName) {
   enterBehavior(behaviorName);
 }
 
-export function overrideRaw(eyeObj) {
+export function overrideRaw(obj) {
   overrideActive = true;
   interruptCurrent();
-  if (eyeObj) {
-    // Direct eye target — for time display etc.
-    if (eyeObj.leftEye) Object.assign(target.left, eyeObj.leftEye);
-    if (eyeObj.rightEye) Object.assign(target.right, eyeObj.rightEye);
-    if (eyeObj.mouth) Object.assign(target.mouth, eyeObj.mouth);
-    if (eyeObj.face) Object.assign(target.face, eyeObj.face);
-    if (eyeObj.eyeGap) target.gap = eyeObj.eyeGap;
+  if (obj) {
+    // Accept both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
+    const l = obj.left || obj.leftEye;
+    const r = obj.right || obj.rightEye;
+    if (l) Object.assign(target.left, l);
+    if (r) Object.assign(target.right, r);
+    if (obj.mouth) Object.assign(target.mouth, obj.mouth);
+    if (obj.face) Object.assign(target.face, obj.face);
+    if (obj.gap !== undefined) target.gap = obj.gap;
+    else if (obj.eyeGap !== undefined) target.gap = obj.eyeGap;
   }
 }
 
@@ -361,7 +368,7 @@ export function releaseOverride() {
 export function mood(name) {
   if (BEHAVIORS[name]) {
     ambientBehavior = name;
-    if (!overrideActive && !chain && chainPhase === 'none') {
+    if (!overrideActive && !activeChain && chainPhase === 'none') {
       enterBehavior(name);
     }
   }
@@ -386,7 +393,7 @@ export function isRadioPlaying() { return renderer.isRadioPlaying(); }
 
 // State queries
 export function getTarget() { return target; }
-export function isIdleBlocked() { return overrideActive || chain !== null || chainPhase !== 'none'; }
+export function isIdleBlocked() { return overrideActive || activeChain !== null || chainPhase !== 'none'; }
 export function getCurrentBehavior() { return currentBehaviorName; }
 export function getPhase() { return chainPhase; }
 export function getReactions() { return CHAINS; } // legacy compat

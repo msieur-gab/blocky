@@ -16,32 +16,32 @@ export const catalog = {
 
   greet: {
     steps: [
-      { behavior: 'surprise', dur: 300 },
-      { behavior: 'excited',  dur: 400 },
+      { behavior: 'surprise', dur: 300, sound: 'chirp_up' },
+      { behavior: 'excited',  dur: 400, sound: 'babble_excited' },
       { behavior: 'happy',    dur: 600 },
     ],
   },
 
   child_laughed: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'happy',    dur: 400 },
-      { behavior: 'silly',    dur: 600 },
+      { behavior: 'surprise', dur: 200, sound: 'chirp_up' },
+      { behavior: 'happy',    dur: 400, sound: 'laugh' },
+      { behavior: 'silly',    dur: 600, sound: 'giggle' },
     ],
   },
 
   love_reaction: {
     steps: [
-      { behavior: 'surprise',   dur: 300 },
-      { behavior: 'heart_eyes', dur: 2400 },
+      { behavior: 'surprise',   dur: 300, sound: 'chirp_up' },
+      { behavior: 'heart_eyes', dur: 2400, sound: 'hum_happy' },
       { behavior: 'happy',      dur: 800 },
     ],
   },
 
   embarrassed_reaction: {
     steps: [
-      { behavior: 'embarrassed', dur: 800 },
-      { behavior: 'silly',       dur: 400 },
+      { behavior: 'embarrassed', dur: 800, sound: 'fart_squeak' },
+      { behavior: 'silly',       dur: 400, sound: 'giggle' },
     ],
   },
 
@@ -49,22 +49,22 @@ export const catalog = {
 
   child_sad: {
     steps: [
-      { behavior: 'sad',  dur: 400 },
-      { behavior: 'love', dur: 600 },
+      { behavior: 'sad',  dur: 400, sound: 'whimper' },
+      { behavior: 'love', dur: 600, sound: 'hum_sad' },
     ],
   },
 
   child_scared: {
     steps: [
-      { behavior: 'scared', dur: 300 },
-      { behavior: 'love',   dur: 500 },
+      { behavior: 'scared', dur: 300, sound: 'squeak' },
+      { behavior: 'love',   dur: 500, sound: 'hum' },
     ],
   },
 
   child_angry: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'sad',      dur: 400 },
+      { behavior: 'surprise', dur: 200, sound: 'chirp_down' },
+      { behavior: 'sad',      dur: 400, sound: 'whimper' },
     ],
   },
 
@@ -72,32 +72,32 @@ export const catalog = {
 
   loud_noise: {
     steps: [
-      { behavior: 'shocked',  dur: 120 },
-      { behavior: 'scared',   dur: 300 },
+      { behavior: 'shocked',  dur: 120, sound: 'squeak' },
+      { behavior: 'scared',   dur: 300, sound: 'whimper' },
       { behavior: 'curious',  dur: 500 },
     ],
   },
 
   picked_up: {
     steps: [
-      { behavior: 'surprise', dur: 150 },
-      { behavior: 'excited',  dur: 300 },
+      { behavior: 'surprise', dur: 150, sound: 'chirp_up' },
+      { behavior: 'excited',  dur: 300, sound: 'babble_fast' },
       { behavior: 'happy',    dur: 400 },
     ],
   },
 
   put_down: {
     steps: [
-      { behavior: 'surprise', dur: 150 },
+      { behavior: 'surprise', dur: 150, sound: 'chirp_down' },
       { behavior: 'curious',  dur: 300 },
-      { behavior: 'calm',     dur: 500 },
+      { behavior: 'calm',     dur: 500, sound: 'hum' },
     ],
   },
 
   shaken: {
     steps: [
-      { behavior: 'dizzy', dur: 600 },
-      { behavior: 'silly', dur: 400 },
+      { behavior: 'dizzy', dur: 600, sound: 'warble' },
+      { behavior: 'silly', dur: 400, sound: 'giggle' },
     ],
   },
 
@@ -135,28 +135,28 @@ export const catalog = {
 
   attention: {
     steps: [
-      { behavior: 'curious',   dur: 900 },
+      { behavior: 'curious',   dur: 900, sound: 'chirp_short' },
       { behavior: 'curious_b', dur: 600 },
-      { behavior: 'curious',   dur: 500 },
+      { behavior: 'curious',   dur: 500, sound: 'chirp_short' },
     ],
   },
 
   thinking_reaction: {
     steps: [
-      { behavior: 'thinking', dur: 1500 },
+      { behavior: 'thinking', dur: 1500, sound: 'babble_question' },
     ],
   },
 
   surprised_reaction: {
     steps: [
-      { behavior: 'surprise', dur: 300 },
-      { behavior: 'excited',  dur: 500 },
+      { behavior: 'surprise', dur: 300, sound: 'boing' },
+      { behavior: 'excited',  dur: 500, sound: 'chirp_up' },
     ],
   },
 
   voice_detected: {
     steps: [
-      { behavior: 'curious', dur: 300 },
+      { behavior: 'curious', dur: 300, sound: 'chirp_short' },
     ],
   },
 
@@ -164,14 +164,14 @@ export const catalog = {
 
   face_recognized: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'happy',    dur: 600 },
+      { behavior: 'surprise', dur: 200, sound: 'chirp_up' },
+      { behavior: 'happy',    dur: 600, sound: 'babble_fast' },
     ],
   },
 
   face_unknown: {
     steps: [
-      { behavior: 'curious',   dur: 400 },
+      { behavior: 'curious',   dur: 400, sound: 'babble_question' },
       { behavior: 'curious_b', dur: 400 },
       { behavior: 'curious',   dur: 300 },
     ],
@@ -179,9 +179,9 @@ export const catalog = {
 
   face_enrolled: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'starry',   dur: 500 },
-      { behavior: 'happy',    dur: 600 },
+      { behavior: 'surprise', dur: 200, sound: 'boing' },
+      { behavior: 'starry',   dur: 500, sound: 'fanfare' },
+      { behavior: 'happy',    dur: 600, sound: 'babble_excited' },
     ],
   },
 
@@ -189,18 +189,17 @@ export const catalog = {
 
   music_start: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'musical',  dur: 600 },
-      { behavior: 'radio',    dur: 800 },
+      { behavior: 'surprise', dur: 200, sound: 'chirp_up' },
+      { behavior: 'musical',  dur: 600, sound: 'twinkle' },
+      { behavior: 'radio',    dur: 800, sound: 'hum_happy' },
     ],
   },
 
-  // Alias for radio skill compatibility
   music: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'musical',  dur: 600 },
-      { behavior: 'radio',    dur: 800 },
+      { behavior: 'surprise', dur: 200, sound: 'chirp_up' },
+      { behavior: 'musical',  dur: 600, sound: 'twinkle' },
+      { behavior: 'radio',    dur: 800, sound: 'hum_happy' },
     ],
   },
 
@@ -208,54 +207,64 @@ export const catalog = {
 
   game_start: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'starry',   dur: 600 },
-      { behavior: 'excited',  dur: 500 },
+      { behavior: 'surprise', dur: 200, sound: 'powerup' },
+      { behavior: 'starry',   dur: 600, sound: 'fanfare' },
+      { behavior: 'excited',  dur: 500, sound: 'babble_excited' },
     ],
   },
 
   game_win: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'starry',   dur: 600 },
-      { behavior: 'happy',    dur: 500 },
+      { behavior: 'surprise', dur: 200, sound: 'fanfare' },
+      { behavior: 'starry',   dur: 400, sound: 'win', face: { tilt: 15 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: -15 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: 12 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: -12 }, sound: 'laugh_big' },
+      { behavior: 'happy',    dur: 500, sound: 'babble_excited' },
     ],
   },
 
   game_lose: {
     steps: [
-      { behavior: 'shocked',    dur: 300 },
-      { behavior: 'dizzy',      dur: 400 },
-      { behavior: 'sad',        dur: 500 },
-      { behavior: 'determined', dur: 600 },
-      { behavior: 'excited',    dur: 400 },
+      { behavior: 'shocked',    dur: 300, sound: 'squeak' },
+      { behavior: 'dizzy',      dur: 400, sound: 'warble' },
+      { behavior: 'sad',        dur: 500, sound: 'whimper' },
+      { behavior: 'determined', dur: 600, sound: 'grumble' },
+      { behavior: 'excited',    dur: 400, sound: 'babble_fast' },
     ],
   },
 
   game_tie: {
     steps: [
-      { behavior: 'thinking',   dur: 400 },
-      { behavior: 'determined', dur: 500 },
+      { behavior: 'thinking',   dur: 400, sound: 'hum' },
+      { behavior: 'determined', dur: 500, sound: 'babble_fast' },
     ],
   },
 
   game_over_player: {
     steps: [
-      { behavior: 'shocked',  dur: 400 },
-      { behavior: 'angry',    dur: 600 },
+      { behavior: 'shocked',  dur: 400, sound: 'squeak' },
+      { behavior: 'angry',    dur: 600, sound: 'grumble' },
       { behavior: 'annoyed',  dur: 500 },
-      { behavior: 'sad',      dur: 600 },
-      { behavior: 'surprise', dur: 300 },
-      { behavior: 'starry',   dur: 600 },
-      { behavior: 'happy',    dur: 600 },
+      { behavior: 'sad',      dur: 600, sound: 'whimper' },
+      { behavior: 'surprise', dur: 300, sound: 'powerup' },
+      { behavior: 'starry',   dur: 400, sound: 'fanfare', face: { tilt: 12 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: -12 } },
+      { behavior: 'starry',   dur: 300, sound: 'win', face: { tilt: 15 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: -15 } },
+      { behavior: 'happy',    dur: 600, sound: 'laugh_big' },
     ],
   },
 
   game_over_blocky: {
     steps: [
-      { behavior: 'surprise', dur: 200 },
-      { behavior: 'starry',   dur: 500 },
-      { behavior: 'excited',  dur: 500 },
+      { behavior: 'surprise', dur: 200, sound: 'powerup' },
+      { behavior: 'starry',   dur: 500, sound: 'fanfare' },
+      { behavior: 'starry',   dur: 300, sound: 'win', face: { tilt: 20 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: -20 } },
+      { behavior: 'starry',   dur: 300, face: { tilt: 15 }, sound: 'laugh_big' },
+      { behavior: 'starry',   dur: 300, face: { tilt: -15 } },
+      { behavior: 'excited',  dur: 500, sound: 'babble_excited' },
       { behavior: 'happy',    dur: 600 },
     ],
   },
@@ -272,8 +281,8 @@ export const catalog = {
 
   long_silence: {
     steps: [
-      { behavior: 'bored',   dur: 2000 },
-      { behavior: 'yawning', dur: 1200 },
+      { behavior: 'bored',   dur: 2000, sound: 'grumble' },
+      { behavior: 'yawning', dur: 1200, sound: 'yawn_sound' },
       { behavior: 'sleepy',  dur: 800 },
     ],
   },
