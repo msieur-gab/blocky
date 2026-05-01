@@ -169,7 +169,7 @@ export async function init() {
   // Init NLU engine in background (non-blocking)
   nlu.init().catch(e => console.warn('[intent] NLU init failed:', e));
 
-  console.log('[intent] Ready (NLU-only mode — rules commented out)');
+  console.log('[intent] Ready (rules + NLU)');
 }
 
 export function stop() {
@@ -197,14 +197,14 @@ function onSentence(sentence) {
     return;
   }
 
-  // // ── Tier 1: Rules (commented out — testing NLU-only) ──
-  // const ruleMatch = matchRules(text);
-  // if (ruleMatch) {
-  //   emitIntent(ruleMatch, {}, 1.0, 'rules');
-  //   return;
-  // }
+  // ── Tier 1: Rules (fast keyword match) ──
+  const ruleMatch = matchRules(text);
+  if (ruleMatch) {
+    emitIntent(ruleMatch, {}, 1.0, 'rules');
+    return;
+  }
 
-  // ── NLU semantic classification ──
+  // ── Tier 2: NLU semantic classification ──
   if (nlu.isReady()) {
     runNLU(text);
   }
