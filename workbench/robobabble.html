@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoboBabble</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Anybody:wght@300;700;900&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --border: #1e2330;
+    --accent: #3efa8e;
+    --accent-dim: #1a7a42;
+    --warm: #fa923e;
+    --text: #c8cdd8;
+    --text-dim: #5a6070;
+    --glow: rgba(62, 250, 142, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    font-family: 'Anybody', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(62, 250, 142, 0.08);
+    margin-bottom: 0.2rem;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 2.5rem;
+  }
+
+  .robot {
+    width: 140px; height: 120px;
+    position: relative; margin-bottom: 2rem;
+  }
+
+  .robot-head {
+    width: 100%; height: 80px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 16px 16px 8px 8px;
+    position: relative;
+    display: flex; justify-content: center; align-items: center; gap: 24px;
+    transition: border-color 0.4s;
+  }
+
+  .robot-head.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--glow), inset 0 0 20px rgba(62, 250, 142, 0.03);
+  }
+
+  .eye {
+    width: 22px; height: 22px;
+    background: var(--text-dim);
+    border-radius: 50%; transition: all 0.3s; position: relative;
+  }
+  .eye::after {
+    content: ''; position: absolute; top: 4px; left: 4px;
+    width: 8px; height: 8px; background: var(--bg); border-radius: 50%;
+  }
+  .robot-head.active .eye {
+    background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  }
+
+  .antenna {
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    width: 2px; height: 18px; background: var(--border);
+  }
+  .antenna::after {
+    content: ''; position: absolute; top: -5px; left: -4px;
+    width: 10px; height: 10px; background: var(--text-dim); border-radius: 50%;
+    transition: all 0.3s;
+  }
+  .robot-head.active .antenna::after {
+    background: var(--warm); box-shadow: 0 0 10px var(--warm);
+    animation: pulse-antenna 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-antenna {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.7); }
+  }
+
+  .mouth {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 4px; background: var(--text-dim); border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .robot-head.active .mouth { background: var(--accent); box-shadow: 0 0 8px rgba(62, 250, 142, 0.5); }
+  .mouth.speaking { animation: speak 0.15s ease infinite alternate; }
+  @keyframes speak {
+    0% { height: 4px; width: 30px; border-radius: 2px; }
+    100% { height: 14px; width: 22px; border-radius: 6px; }
+  }
+
+  .robot-body {
+    width: 60px; height: 30px;
+    background: var(--surface); border: 2px solid var(--border); border-top: none;
+    border-radius: 0 0 10px 10px; margin: 0 auto; transition: border-color 0.4s;
+  }
+  .robot-head.active ~ .robot-body { border-color: var(--accent-dim); }
+
+  .vu-meter { display: flex; gap: 3px; align-items: flex-end; height: 30px; margin-bottom: 1.5rem; }
+  .vu-bar {
+    width: 4px; background: var(--accent); border-radius: 2px;
+    transition: height 0.08s ease; opacity: 0.7;
+  }
+
+  .mic-btn {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 3px solid var(--border); background: var(--surface);
+    color: var(--text-dim); font-size: 2rem; cursor: pointer;
+    transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 2rem; position: relative;
+  }
+  .mic-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 30px var(--glow); }
+  .mic-btn.active {
+    border-color: var(--warm); background: rgba(250, 146, 62, 0.1);
+    color: var(--warm); box-shadow: 0 0 30px rgba(250, 146, 62, 0.2);
+    animation: pulse-ring 2s ease-in-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 30px rgba(250, 146, 62, 0.2); }
+    50% { box-shadow: 0 0 50px rgba(250, 146, 62, 0.35); }
+  }
+  .mic-btn .label {
+    position: absolute; bottom: -1.8rem; font-size: 0.6rem;
+    letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+  }
+
+  .presets {
+    display: flex; gap: 0.5rem; margin-bottom: 2rem;
+    flex-wrap: wrap; justify-content: center; max-width: 400px;
+  }
+  .preset {
+    font-family: 'Space Mono', monospace; font-size: 0.65rem;
+    letter-spacing: 0.05em; padding: 0.4rem 0.8rem; border-radius: 20px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+  }
+  .preset:hover, .preset.active {
+    border-color: var(--accent); color: var(--accent); background: rgba(62, 250, 142, 0.05);
+  }
+
+  .controls {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+    width: 100%; max-width: 400px; margin-bottom: 1.5rem;
+  }
+  .control {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.9rem 1rem;
+  }
+  .control-label {
+    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 0.5rem; display: flex; justify-content: space-between;
+  }
+  .control-value { font-size: 0.7rem; color: var(--accent); font-weight: 700; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    background: var(--accent); border-radius: 50%; cursor: pointer;
+    box-shadow: 0 0 8px var(--glow);
+  }
+
+  .status { font-size: 0.65rem; color: var(--text-dim); margin-top: 1rem; text-align: center; min-height: 1.2em; }
+  .status.error { color: #fa3e5c; }
+</style>
+</head>
+<body>
+
+<h1>RoboBabble</h1>
+<p class="subtitle">Voice → Robot in real time</p>
+
+<div class="robot">
+  <div class="robot-head" id="robotHead">
+    <div class="antenna"></div>
+    <div class="eye"></div>
+    <div class="eye"></div>
+    <div class="mouth" id="mouth"></div>
+  </div>
+  <div class="robot-body"></div>
+</div>
+
+<div class="vu-meter" id="vuMeter"></div>
+
+<button class="mic-btn" id="micBtn">
+  ◉
+  <span class="label" id="micLabel">Tap to start</span>
+</button>
+
+<div class="presets">
+  <button class="preset" data-preset="walle">Wall·E</button>
+  <button class="preset" data-preset="droid">Droid</button>
+  <button class="preset" data-preset="glitch">Glitch</button>
+  <button class="preset" data-preset="tiny">Tiny Bot</button>
+  <button class="preset" data-preset="dark">Dark Mech</button>
+</div>
+
+<div class="controls">
+  <div class="control">
+    <div class="control-label">Pitch <span class="control-value" id="pitchVal">+5</span></div>
+    <input type="range" id="pitch" min="-12" max="24" value="5" step="1">
+  </div>
+  <div class="control">
+    <div class="control-label">Bitcrush <span class="control-value" id="crushVal">8</span></div>
+    <input type="range" id="crush" min="2" max="16" value="8" step="1">
+  </div>
+  <div class="control">
+    <div class="control-label">Filter <span class="control-value" id="filterVal">2500Hz</span></div>
+    <input type="range" id="filter" min="200" max="8000" value="2500" step="100">
+  </div>
+  <div class="control">
+    <div class="control-label">Tremolo <span class="control-value" id="tremoloVal">6Hz</span></div>
+    <input type="range" id="tremolo" min="0" max="30" value="6" step="1">
+  </div>
+  <div class="control">
+    <div class="control-label">Downsample <span class="control-value" id="downVal">4</span></div>
+    <input type="range" id="down" min="1" max="40" value="4" step="1">
+  </div>
+  <div class="control">
+    <div class="control-label">Drive <span class="control-value" id="driveVal">3</span></div>
+    <input type="range" id="drive" min="1" max="20" value="3" step="1">
+  </div>
+  <div class="control">
+    <div class="control-label">Echo Time <span class="control-value" id="echoTimeVal">120ms</span></div>
+    <input type="range" id="echoTime" min="0" max="500" value="120" step="10">
+  </div>
+  <div class="control">
+    <div class="control-label">Echo Feedback <span class="control-value" id="echoFbVal">30%</span></div>
+    <input type="range" id="echoFb" min="0" max="90" value="30" step="5">
+  </div>
+  <div class="control">
+    <div class="control-label">Reverb <span class="control-value" id="reverbVal">25%</span></div>
+    <input type="range" id="reverb" min="0" max="100" value="25" step="5">
+  </div>
+  <div class="control">
+    <div class="control-label">Reverb Decay <span class="control-value" id="reverbDecayVal">2.0s</span></div>
+    <input type="range" id="reverbDecay" min="5" max="50" value="20" step="5">
+  </div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// VU meter
+const vuMeter = $('vuMeter');
+for (let i = 0; i < 20; i++) {
+  const bar = document.createElement('div');
+  bar.className = 'vu-bar';
+  bar.style.height = '2px';
+  vuMeter.appendChild(bar);
+}
+const vuBars = vuMeter.querySelectorAll('.vu-bar');
+
+// State
+let ctx, micStream, sourceNode, analyser;
+let crushNode, filterNode, tremoloGain, tremoloOsc, waveShaperNode;
+let echoDelay, echoFeedbackGain, echoWetGain;
+let reverbConvolver, reverbWetGain, reverbDryGain;
+let lastDecay = 20;
+let isActive = false;
+
+// Presets
+const presets = {
+  walle:  { pitch: 5,  crush: 8,  filter: 2500, tremolo: 6,  down: 4,  drive: 3,  echoTime: 120, echoFb: 30, reverb: 25, reverbDecay: 20 },
+  droid:  { pitch: 12, crush: 6,  filter: 3500, tremolo: 12, down: 2,  drive: 1,  echoTime: 80,  echoFb: 20, reverb: 15, reverbDecay: 15 },
+  glitch: { pitch: 0,  crush: 3,  filter: 5000, tremolo: 20, down: 10, drive: 8,  echoTime: 200, echoFb: 60, reverb: 40, reverbDecay: 30 },
+  tiny:   { pitch: 20, crush: 12, filter: 4000, tremolo: 4,  down: 2,  drive: 2,  echoTime: 60,  echoFb: 15, reverb: 30, reverbDecay: 10 },
+  dark:   { pitch: -8, crush: 5,  filter: 1200, tremolo: 2,  down: 6,  drive: 10, echoTime: 350, echoFb: 50, reverb: 60, reverbDecay: 40 },
+};
+
+function setStatus(msg, isError) {
+  $('status').textContent = msg;
+  $('status').className = 'status' + (isError ? ' error' : '');
+}
+
+// Bitcrusher via ScriptProcessor (widely supported)
+function createBitcrusher(context) {
+  const bufferSize = 4096;
+  const node = context.createScriptProcessor(bufferSize, 1, 1);
+  node._bits = 8;
+  node._downsample = 4;
+  node.onaudioprocess = function(e) {
+    const input = e.inputBuffer.getChannelData(0);
+    const output = e.outputBuffer.getChannelData(0);
+    const bits = node._bits;
+    const downsample = node._downsample;
+    const step = Math.pow(0.5, bits);
+    let lastSample = 0;
+    for (let i = 0; i < input.length; i++) {
+      if (i % downsample === 0) {
+        lastSample = step * Math.floor(input[i] / step + 0.5);
+      }
+      output[i] = lastSample;
+    }
+  };
+  return node;
+}
+
+// Waveshaper for overdrive/distortion
+function makeDistortionCurve(amount) {
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  const k = amount;
+  for (let i = 0; i < samples; i++) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = ((Math.PI + k) * x) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+// Pitch shift via playbackRate on a looping delay trick — 
+// For simplicity we use a different approach: resample the mic signal.
+// Actually the most reliable browser pitch shift: use the detune on an OscillatorNode
+// approach won't work. Let's use a granular approach via ScriptProcessor.
+function createPitchShifter(context) {
+  const grainSize = 0.1; // 100ms grains
+  const overlap = 0.5;
+  const bufferSize = 4096;
+  const node = context.createScriptProcessor(bufferSize, 1, 1);
+  node._semitones = 5;
+
+  // Simple resampling-based pitch shift
+  // We collect audio into a circular buffer and read at a different rate
+  const circBufLen = context.sampleRate * 2;
+  const circBuf = new Float32Array(circBufLen);
+  let writePos = 0;
+  let readPos = 0;
+
+  node.onaudioprocess = function(e) {
+    const input = e.inputBuffer.getChannelData(0);
+    const output = e.outputBuffer.getChannelData(0);
+    const rate = Math.pow(2, node._semitones / 12);
+
+    // Write input to circular buffer
+    for (let i = 0; i < input.length; i++) {
+      circBuf[writePos % circBufLen] = input[i];
+      writePos++;
+    }
+
+    // Read from circular buffer at shifted rate
+    for (let i = 0; i < output.length; i++) {
+      const readIndex = readPos;
+      const idx0 = Math.floor(readIndex) % circBufLen;
+      const idx1 = (idx0 + 1) % circBufLen;
+      const frac = readIndex - Math.floor(readIndex);
+
+      // Handle negative modulo
+      const safeIdx0 = ((idx0 % circBufLen) + circBufLen) % circBufLen;
+      const safeIdx1 = ((idx1 % circBufLen) + circBufLen) % circBufLen;
+
+      output[i] = circBuf[safeIdx0] * (1 - frac) + circBuf[safeIdx1] * frac;
+      readPos += rate;
+    }
+
+    // Keep readPos from getting too far behind writePos
+    const lag = writePos - readPos;
+    if (lag > circBufLen * 0.8) {
+      readPos = writePos - circBufLen * 0.5;
+    } else if (lag < bufferSize * 2) {
+      readPos = writePos - circBufLen * 0.3;
+    }
+  };
+
+  return node;
+}
+
+function createImpulseResponse(context, duration, decay) {
+  const length = context.sampleRate * duration;
+  const impulse = context.createBuffer(2, length, context.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  return impulse;
+}
+
+async function startAudio() {
+  try {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    sourceNode = ctx.createMediaStreamSource(micStream);
+
+    // Create nodes
+    const pitchNode = createPitchShifter(ctx);
+    crushNode = createBitcrusher(ctx);
+
+    filterNode = ctx.createBiquadFilter();
+    filterNode.type = 'bandpass';
+    filterNode.frequency.value = 2500;
+    filterNode.Q.value = 1.5;
+
+    waveShaperNode = ctx.createWaveShaper();
+    waveShaperNode.curve = makeDistortionCurve(3);
+    waveShaperNode.oversample = '4x';
+
+    // Tremolo = LFO oscillator → gain
+    tremoloGain = ctx.createGain();
+    tremoloGain.gain.value = 1;
+    tremoloOsc = ctx.createOscillator();
+    tremoloOsc.type = 'sine';
+    tremoloOsc.frequency.value = 6;
+    const tremoloDepth = ctx.createGain();
+    tremoloDepth.gain.value = 0.5;
+    tremoloOsc.connect(tremoloDepth);
+    tremoloDepth.connect(tremoloGain.gain);
+    tremoloOsc.start();
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+
+    // Echo: feedback delay
+    echoDelay = ctx.createDelay(1.0);
+    echoDelay.delayTime.value = +$('echoTime').value / 1000;
+    echoFeedbackGain = ctx.createGain();
+    echoFeedbackGain.gain.value = +$('echoFb').value / 100;
+    echoWetGain = ctx.createGain();
+
+    // Reverb: convolver with generated impulse
+    reverbConvolver = ctx.createConvolver();
+    const rd = +$('reverbDecay').value;
+    reverbConvolver.buffer = createImpulseResponse(ctx, rd / 10, 2.5);
+    lastDecay = rd;
+    const rv = +$('reverb').value / 100;
+    reverbWetGain = ctx.createGain();
+    reverbWetGain.gain.value = rv;
+    reverbDryGain = ctx.createGain();
+    reverbDryGain.gain.value = 1 - rv;
+
+    // Chain: mic → pitch → crush → filter → drive → tremolo → echo → reverb → analyser → output
+    sourceNode.connect(pitchNode);
+    pitchNode.connect(crushNode);
+    crushNode.connect(filterNode);
+    filterNode.connect(waveShaperNode);
+    waveShaperNode.connect(tremoloGain);
+
+    // Echo: dry + delayed feedback
+    const postEcho = ctx.createGain();
+    tremoloGain.connect(postEcho);
+    tremoloGain.connect(echoDelay);
+    echoDelay.connect(echoFeedbackGain);
+    echoFeedbackGain.connect(echoDelay);
+    echoDelay.connect(echoWetGain);
+    echoWetGain.connect(postEcho);
+
+    // Reverb: dry/wet split
+    postEcho.connect(reverbDryGain);
+    postEcho.connect(reverbConvolver);
+    reverbConvolver.connect(reverbWetGain);
+    reverbDryGain.connect(analyser);
+    reverbWetGain.connect(analyser);
+
+    analyser.connect(ctx.destination);
+
+    // Store refs for updating
+    window._pitchNode = pitchNode;
+    window._crushNode = crushNode;
+
+    updateEffects();
+    isActive = true;
+    $('micBtn').classList.add('active');
+    $('micLabel').textContent = 'Tap to stop';
+    $('robotHead').classList.add('active');
+    setStatus('Listening — speak into your mic');
+    animateVU();
+
+  } catch (err) {
+    setStatus('Mic access denied: ' + err.message, true);
+    console.error(err);
+  }
+}
+
+function stopAudio() {
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (ctx) ctx.close();
+  micStream = null; ctx = null; sourceNode = null;
+  isActive = false;
+  $('micBtn').classList.remove('active');
+  $('micLabel').textContent = 'Tap to start';
+  $('robotHead').classList.remove('active');
+  $('mouth').classList.remove('speaking');
+  vuBars.forEach(b => b.style.height = '2px');
+  setStatus('');
+}
+
+function updateEffects() {
+  const p = +$('pitch').value;
+  const c = +$('crush').value;
+  const f = +$('filter').value;
+  const t = +$('tremolo').value;
+  const d = +$('down').value;
+  const dr = +$('drive').value;
+
+  $('pitchVal').textContent = (p > 0 ? '+' : '') + p;
+  $('crushVal').textContent = c;
+  $('filterVal').textContent = f + 'Hz';
+  $('tremoloVal').textContent = t + 'Hz';
+  $('downVal').textContent = d;
+  $('driveVal').textContent = dr;
+
+  const et = +$('echoTime').value;
+  const ef = +$('echoFb').value;
+  const rv = +$('reverb').value;
+  const rd = +$('reverbDecay').value;
+  $('echoTimeVal').textContent = et + 'ms';
+  $('echoFbVal').textContent = ef + '%';
+  $('reverbVal').textContent = rv + '%';
+  $('reverbDecayVal').textContent = (rd / 10).toFixed(1) + 's';
+
+  if (window._pitchNode) window._pitchNode._semitones = p;
+  if (window._crushNode) { window._crushNode._bits = c; window._crushNode._downsample = d; }
+  if (filterNode) filterNode.frequency.value = f;
+  if (tremoloOsc) tremoloOsc.frequency.value = Math.max(0.1, t);
+  if (waveShaperNode) waveShaperNode.curve = makeDistortionCurve(dr);
+  if (echoDelay) echoDelay.delayTime.value = et / 1000;
+  if (echoFeedbackGain) echoFeedbackGain.gain.value = ef / 100;
+  if (reverbWetGain) { reverbWetGain.gain.value = rv / 100; reverbDryGain.gain.value = 1 - rv / 100; }
+  if (reverbConvolver && ctx && rd !== lastDecay) {
+    reverbConvolver.buffer = createImpulseResponse(ctx, rd / 10, 2.5);
+    lastDecay = rd;
+  }
+}
+
+function animateVU() {
+  if (!isActive || !analyser) return;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  const avg = data.reduce((a, b) => a + b, 0) / data.length / 255;
+
+  $('mouth').classList.toggle('speaking', avg > 0.05);
+  vuBars.forEach((bar, i) => {
+    const center = 10;
+    const dist = Math.abs(i - center) / center;
+    const h = Math.max(2, avg * (1 - dist * 0.6) * 30);
+    bar.style.height = h + 'px';
+    bar.style.opacity = 0.3 + avg * 0.7;
+    bar.style.background = avg > 0.4 ? 'var(--warm)' : 'var(--accent)';
+  });
+  requestAnimationFrame(animateVU);
+}
+
+// Events
+$('micBtn').addEventListener('click', () => isActive ? stopAudio() : startAudio());
+['pitch', 'crush', 'filter', 'tremolo', 'down', 'drive', 'echoTime', 'echoFb', 'reverb', 'reverbDecay'].forEach(id => {
+  $(id).addEventListener('input', updateEffects);
+});
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const p = presets[btn.dataset.preset];
+    $('pitch').value = p.pitch; $('crush').value = p.crush;
+    $('filter').value = p.filter; $('tremolo').value = p.tremolo;
+    $('down').value = p.down; $('drive').value = p.drive;
+    $('echoTime').value = p.echoTime; $('echoFb').value = p.echoFb;
+    $('reverb').value = p.reverb; $('reverbDecay').value = p.reverbDecay;
+    updateEffects();
+  });
+});
+
+updateEffects();
+</script>
+</body>
+</html>
