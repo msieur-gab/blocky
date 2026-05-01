@@ -1,1 +1,3 @@
 output/
+assets/sherpa/**/*.wasm
+assets/sherpa/**/*.data

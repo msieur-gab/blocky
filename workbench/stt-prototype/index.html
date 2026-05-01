@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>ami.b — STT prototype (sherpa-onnx)</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background: #0d0f12;
+    color: #e6e6e6;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
+  h1 { font-size: 1.05rem; margin: 0 0 1rem; font-weight: 600; color: #aaa; letter-spacing: 0.02em; }
+  h1 .tag { color: #4ade80; font-weight: 500; }
+
+  #status {
+    background: #1a1d22;
+    border: 1px solid #2a2e36;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+  #status.ready { border-color: #4ade80; color: #4ade80; }
+  #status.error { border-color: #ef4444; color: #ef4444; }
+  #status .progress { display: block; font-size: 0.85rem; color: #888; margin-top: 0.25rem; }
+
+  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.25rem; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: #14171c;
+    border: 1px solid #2a2e36;
+    border-radius: 6px;
+    padding: 1rem;
+  }
+
+  .partial-box {
+    min-height: 5rem;
+    padding: 1rem;
+    background: #0a0c0f;
+    border: 1px dashed #2a2e36;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+    line-height: 1.3;
+    color: #fde047;
+    font-weight: 500;
+    word-break: break-word;
+  }
+  .partial-box.empty { color: #444; font-size: 1rem; font-style: italic; font-weight: 400; }
+
+  .finals { font-size: 0.95rem; }
+  .finals .item {
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid #4ade80;
+    background: #0f1217;
+    margin-bottom: 0.4rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .finals .item .ts { color: #666; font-size: 0.75rem; margin-right: 0.5rem; }
+  .finals .item .text { color: #e6e6e6; }
+  .finals .empty { color: #555; font-style: italic; padding: 0.5rem 0; }
+
+  .controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  button {
+    background: #2a2e36;
+    color: #e6e6e6;
+    border: 1px solid #3a3e46;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  button:hover:not(:disabled) { background: #3a3e46; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: #4ade80; color: #0a0c0f; border-color: #4ade80; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: #22c55e; }
+  button.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+  .meter {
+    height: 8px;
+    background: #1a1d22;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .meter > div { height: 100%; background: #4ade80; width: 0%; transition: width 80ms linear; }
+
+  .stats { font-size: 0.85rem; }
+  .stats .row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px dotted #2a2e36; }
+  .stats .row:last-child { border-bottom: none; }
+  .stats .k { color: #888; }
+  .stats .v { color: #e6e6e6; font-variant-numeric: tabular-nums; }
+
+  .log {
+    font-size: 0.75rem;
+    color: #888;
+    background: #0a0c0f;
+    border: 1px solid #2a2e36;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    max-height: 240px;
+    overflow-y: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .log .e { display: block; padding: 0.1rem 0; }
+  .log .e.warn { color: #fde047; }
+  .log .e.err { color: #ef4444; }
+
+  details { margin-top: 1rem; font-size: 0.85rem; color: #888; }
+  details summary { cursor: pointer; padding: 0.25rem 0; }
+  details code { background: #1a1d22; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  details pre { background: #0a0c0f; padding: 0.5rem; border-radius: 4px; overflow-x: auto; font-size: 0.75rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ami.b STT prototype <span class="tag">— sherpa-onnx streaming ASR</span></h1>
+
+  <div id="status">Initializing…<span class="progress" id="progress"></span></div>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <div class="controls">
+          <button id="startBtn" class="primary" disabled>Start mic</button>
+          <button id="stopBtn" disabled>Stop</button>
+          <button id="clearBtn">Clear finals</button>
+        </div>
+        <div class="meter"><div id="micLevel"></div></div>
+
+        <div style="font-size: 0.75rem; color: #888; margin-bottom: 0.25rem;">Live partial</div>
+        <div id="partial" class="partial-box empty">Speak after pressing Start. Partials appear here.</div>
+
+        <div style="font-size: 0.75rem; color: #888; margin: 1rem 0 0.25rem;">Final sentences</div>
+        <div id="finals" class="finals"><div class="empty">— none yet —</div></div>
+      </div>
+
+      <details>
+        <summary>Setup notes</summary>
+        <p>This prototype loads <code>assets/sherpa/asr/sherpa-onnx-wasm-main-asr.{js,wasm,data}</code> + <code>sherpa-onnx-asr.js</code> (shared with production). The <code>.wasm</code> and <code>.data</code> files are gitignored (11MB + 183MB).</p>
+        <p>Re-download:</p>
+        <pre>cd assets/sherpa/asr
+for f in sherpa-onnx-asr.js sherpa-onnx-wasm-main-asr.js \
+         sherpa-onnx-wasm-main-asr.wasm sherpa-onnx-wasm-main-asr.data; do
+  curl -L -O "https://huggingface.co/spaces/k2-fsa/web-assembly-asr-sherpa-onnx-en/resolve/main/$f"
+done</pre>
+        <p>Serve over HTTP (mic + WASM need a real origin):</p>
+        <pre>python3 -m http.server 8000
+# then open http://localhost:8000/workbench/stt-prototype/</pre>
+        <p>The bundled model is k2-fsa's full LibriSpeech zipformer (~191MB packed). For production we'll rebuild WASM with the 20M streaming zipformer (~45MB).</p>
+      </details>
+    </div>
+
+    <div>
+      <div class="panel" style="margin-bottom: 1rem;">
+        <div style="font-size: 0.75rem; color: #888; margin-bottom: 0.5rem;">Stats</div>
+        <div class="stats">
+          <div class="row"><span class="k">Sample rate (mic)</span><span class="v" id="statMicRate">—</span></div>
+          <div class="row"><span class="k">Sample rate (target)</span><span class="v">16000 Hz</span></div>
+          <div class="row"><span class="k">Model load</span><span class="v" id="statLoad">—</span></div>
+          <div class="row"><span class="k">Partial latency (last)</span><span class="v" id="statLatency">—</span></div>
+          <div class="row"><span class="k">Partials emitted</span><span class="v" id="statPartials">0</span></div>
+          <div class="row"><span class="k">Finals emitted</span><span class="v" id="statFinals">0</span></div>
+          <div class="row"><span class="k">Endpoint count</span><span class="v" id="statEndpoints">0</span></div>
+          <div class="row"><span class="k">Decode/sec (avg)</span><span class="v" id="statDecode">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="font-size: 0.75rem; color: #888; margin-bottom: 0.5rem;">Log</div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tiny logger ────────────────────────────────────────────────
+const logEl = document.getElementById('log');
+function log(msg, level = '') {
+  const e = document.createElement('span');
+  e.className = 'e ' + level;
+  const ts = new Date().toLocaleTimeString();
+  e.textContent = `[${ts}] ${msg}`;
+  logEl.appendChild(e);
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(msg);
+}
+
+// ── Status ─────────────────────────────────────────────────────
+const statusEl = document.getElementById('status');
+const progressEl = document.getElementById('progress');
+function setStatus(text, cls = '') {
+  statusEl.firstChild.textContent = text;
+  statusEl.className = cls;
+}
+
+// ── DOM hooks ──────────────────────────────────────────────────
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const clearBtn = document.getElementById('clearBtn');
+const partialEl = document.getElementById('partial');
+const finalsEl = document.getElementById('finals');
+const micLevelEl = document.getElementById('micLevel');
+const stat = (id) => document.getElementById('stat' + id);
+
+let finalsCount = 0;
+let partialsCount = 0;
+let endpointsCount = 0;
+let lastPartial = '';
+let lastSpeechAt = 0;
+let lastPartialAt = 0;
+let decodeTimes = [];
+
+function showPartial(text) {
+  if (!text) {
+    partialEl.textContent = 'Speak after pressing Start. Partials appear here.';
+    partialEl.classList.add('empty');
+  } else {
+    partialEl.textContent = text;
+    partialEl.classList.remove('empty');
+  }
+}
+
+function pushFinal(text) {
+  finalsCount++;
+  stat('Finals').textContent = finalsCount;
+  if (finalsEl.querySelector('.empty')) finalsEl.innerHTML = '';
+  const item = document.createElement('div');
+  item.className = 'item';
+  const ts = new Date().toLocaleTimeString();
+  item.innerHTML = `<span class="ts">${ts}</span><span class="text"></span>`;
+  item.querySelector('.text').textContent = text;
+  finalsEl.prepend(item);
+}
+
+clearBtn.onclick = () => {
+  finalsEl.innerHTML = '<div class="empty">— none yet —</div>';
+  finalsCount = 0;
+  stat('Finals').textContent = '0';
+};
+
+// ── Sherpa-onnx Module setup ───────────────────────────────────
+// Must be defined BEFORE sherpa-onnx-wasm-main-asr.js loads.
+const VENDOR = '../../assets/sherpa/asr/';
+const tStart = performance.now();
+let tLoaded = 0;
+
+window.Module = {};
+Module.locateFile = function(path, scriptDirectory = '') {
+  // Files live under ./vendor/ regardless of where the script tags resolved.
+  const url = VENDOR + path;
+  log(`locateFile(${path}) -> ${url}`);
+  return url;
+};
+Module.setStatus = function(s) {
+  if (!s) {
+    setStatus('Recognizer ready. Press Start to listen.', 'ready');
+    progressEl.textContent = '';
+    return;
+  }
+  if (s === 'Running...') s = 'Model unpacked. Initializing recognizer…';
+  const m = s.match(/Downloading data\.\.\. \((\d+)\/(\d+)\)/);
+  if (m) {
+    const [_, dl, total] = m;
+    const pct = total === '0' ? 0 : Math.round((Number(dl) / Number(total)) * 1000) / 10;
+    const dlMB = (Number(dl) / 1048576).toFixed(1);
+    const totalMB = (Number(total) / 1048576).toFixed(1);
+    setStatus(`Loading model… ${pct}%`);
+    progressEl.textContent = `${dlMB} / ${totalMB} MB`;
+    return;
+  }
+  setStatus(s);
+};
+Module.onRuntimeInitialized = function() {
+  tLoaded = performance.now();
+  const ms = Math.round(tLoaded - tStart);
+  stat('Load').textContent = `${ms} ms`;
+  log(`Runtime initialized in ${ms} ms`);
+  try {
+    recognizer = createOnlineRecognizer(Module);
+    log('Recognizer created.');
+    startBtn.disabled = false;
+  } catch (e) {
+    log(`Recognizer creation failed: ${e.message}`, 'err');
+    setStatus('Recognizer creation failed: ' + e.message, 'error');
+  }
+};
+
+// ── Audio + recognition pipeline ───────────────────────────────
+let audioCtx, mediaStream, scriptNode, sourceNode;
+let recognizer = null;
+let recogStream = null;
+let micRate = 0;
+
+async function start() {
+  if (!recognizer) { log('No recognizer yet', 'warn'); return; }
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+
+  try {
+    audioCtx = new AudioContext({ sampleRate: 16000 });
+    micRate = audioCtx.sampleRate;
+    stat('MicRate').textContent = `${micRate} Hz`;
+    log(`AudioContext sample rate: ${micRate} Hz`);
+
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+
+    const bufSize = 4096;
+    scriptNode = audioCtx.createScriptProcessor(bufSize, 1, 2);
+
+    if (!recogStream) recogStream = recognizer.createStream();
+
+    scriptNode.onaudioprocess = (e) => {
+      let samples = new Float32Array(e.inputBuffer.getChannelData(0));
+      if (micRate !== 16000) samples = downsample(samples, micRate, 16000);
+
+      // Mic level (peak)
+      let peak = 0;
+      for (let i = 0; i < samples.length; i++) { const v = Math.abs(samples[i]); if (v > peak) peak = v; }
+      micLevelEl.style.width = Math.min(100, peak * 200) + '%';
+      if (peak > 0.02) lastSpeechAt = performance.now();
+
+      const tDec = performance.now();
+      recogStream.acceptWaveform(16000, samples);
+      while (recognizer.isReady(recogStream)) recognizer.decode(recogStream);
+      decodeTimes.push(performance.now() - tDec);
+      if (decodeTimes.length > 50) decodeTimes.shift();
+
+      const result = recognizer.getResult(recogStream).text || '';
+      const isEndpoint = recognizer.isEndpoint(recogStream);
+
+      if (result && result !== lastPartial) {
+        partialsCount++;
+        stat('Partials').textContent = partialsCount;
+        if (lastSpeechAt) {
+          const lat = Math.round(performance.now() - lastSpeechAt);
+          stat('Latency').textContent = `${lat} ms`;
+          lastPartialAt = performance.now();
+        }
+        showPartial(result);
+        lastPartial = result;
+      }
+
+      if (isEndpoint) {
+        endpointsCount++;
+        stat('Endpoints').textContent = endpointsCount;
+        if (result) { pushFinal(result); log(`Final: "${result}"`); }
+        recognizer.reset(recogStream);
+        lastPartial = '';
+        showPartial('');
+      }
+
+      const avg = decodeTimes.reduce((a, b) => a + b, 0) / decodeTimes.length;
+      // bufSize/16000 seconds = chunk duration; decode/sec = how many chunks/sec we can process
+      stat('Decode').textContent = avg ? `${(1000 / avg).toFixed(1)} chunks/s (avg ${avg.toFixed(1)}ms)` : '—';
+    };
+
+    sourceNode.connect(scriptNode);
+    scriptNode.connect(audioCtx.destination);
+    log('Mic started.');
+    setStatus('Listening…', 'ready');
+  } catch (err) {
+    log(`getUserMedia failed: ${err.message}`, 'err');
+    setStatus('Microphone error: ' + err.message, 'error');
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  }
+}
+
+function stop() {
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  if (scriptNode && sourceNode) {
+    try { sourceNode.disconnect(scriptNode); } catch (e) {}
+    try { scriptNode.disconnect(); } catch (e) {}
+  }
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
+  micLevelEl.style.width = '0%';
+  log('Mic stopped.');
+  setStatus('Stopped. Press Start to resume.', 'ready');
+}
+
+startBtn.onclick = start;
+stopBtn.onclick = stop;
+
+// ── Linear-interp downsampler (only used if AudioContext didn't honor 16kHz) ──
+function downsample(buf, fromRate, toRate) {
+  if (fromRate === toRate) return buf;
+  const ratio = fromRate / toRate;
+  const out = new Float32Array(Math.round(buf.length / ratio));
+  let oi = 0, bi = 0;
+  while (oi < out.length) {
+    const next = Math.round((oi + 1) * ratio);
+    let acc = 0, n = 0;
+    for (let i = bi; i < next && i < buf.length; i++) { acc += buf[i]; n++; }
+    out[oi++] = n ? acc / n : 0;
+    bi = next;
+  }
+  return out;
+}
+
+// ── Boot ───────────────────────────────────────────────────────
+log('Boot: loading sherpa-onnx-asr.js then sherpa-onnx-wasm-main-asr.js');
+setStatus('Loading scripts…');
+
+(function loadScripts() {
+  const s1 = document.createElement('script');
+  s1.src = VENDOR + 'sherpa-onnx-asr.js';
+  s1.onload = () => {
+    log('sherpa-onnx-asr.js loaded.');
+    const s2 = document.createElement('script');
+    s2.src = VENDOR + 'sherpa-onnx-wasm-main-asr.js';
+    s2.onload = () => log('sherpa-onnx-wasm-main-asr.js loaded; runtime booting…');
+    s2.onerror = () => { log('Failed to load wasm loader script', 'err'); setStatus('Failed to load WASM loader', 'error'); };
+    document.body.appendChild(s2);
+  };
+  s1.onerror = () => { log('Failed to load sherpa-onnx-asr.js', 'err'); setStatus('Failed to load wrapper', 'error'); };
+  document.body.appendChild(s1);
+})();
+</script>
+</body>
+</html>
