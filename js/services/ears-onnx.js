@@ -1,53 +1,51 @@
 // ══════════════════════════════════════════
-// Ears Service — On-device sherpa-onnx streaming ASR
+// Ears Service — On-device sherpa-onnx streaming ASR (Worker edition)
 // Drop-in replacement for ears.js (Web Speech API).
 // Same public API, same bus events.
 //
-// Phase 1: streaming ASR via sherpa-onnx WASM (always-active by default).
-// Phase 2: optional wake gate in front of the active stage.
+// Architecture:
+//   AudioWorkletProcessor (audio thread)
+//        │  postMessage(Float32Array, transferred)
+//        ▼
+//   ears-onnx.js (main thread, this file — just a bridge)
+//        │  worker.postMessage(samples, transferred)
+//        ▼
+//   ears-worker.js (Worker thread)
+//        │  sherpa-onnx WASM decodes
+//        ▼
+//   worker.onmessage  →  bus.emit(ear:sentence / ear:interim / …)
 //
-// Wake gate is JS-side ("does the transcript contain the creature name?")
-// rather than a dedicated KWS model — sherpa-onnx KWS has no published
-// WASM bundle and would require an Emscripten build pipeline. The
-// state machine here is the same shape we'd want with a real KWS model;
-// only the detection strategy differs.
+// Why this shape:
+// - Sherpa-onnx and MediaPipe both use the Emscripten "global Module"
+//   pattern. On the main thread they fight over window.Module and the
+//   second loader clobbers the first's HEAPF32 view. Putting sherpa in
+//   a Worker gives it its own self.Module — collision impossible.
+// - AudioWorklet runs on the audio thread, so capture is never starved
+//   by main-thread rendering or MediaPipe inference.
 // ══════════════════════════════════════════
 
 import { bus } from '../utils/events.js';
 import * as memory from './memory.js';
 
-// ── Vendor paths ──
-// Loads sherpa-onnx wasm + the bundled ASR model from assets/sherpa/asr/.
-// The .data blob (~183MB) is the LibriSpeech zipformer preloaded into MEMFS.
-// Production target is to rebuild the WASM with the 20M streaming zipformer.
 const VENDOR = './assets/sherpa/asr/';
-
-// ── Config ──
-const params = (typeof window !== 'undefined') ? new URLSearchParams(window.location.search) : new URLSearchParams();
-const WAKE_ENABLED = params.get('wake') === 'on';
-const ACTIVE_TIMEOUT_MS = 12000;
 
 // ── Module-scoped state ──
 let creatureName = null;
-let stage = 'off';            // 'off' | 'wake' | 'active'
-let recognizer = null;
-let recogStream = null;
+let stage = 'off';            // 'off' | 'active'
+
+let worker = null;
+let workerReady = false;
 
 let audioCtx = null;
 let mediaStream = null;
 let sourceNode = null;
-let scriptNode = null;
-let micSampleRate = 0;
+let workletNode = null;
 
-let lastPartial = '';
+let lastInterim = '';
 const history = [];
 const MAX_HISTORY = 5;
 
 let initPromise = null;
-let consecutiveErrors = 0;
-const ERROR_RESET_THRESHOLD = 3;
-
-let activeTimer = null;       // Phase 2: revert to wake on silence
 
 // ── Public API ──
 
@@ -56,12 +54,9 @@ export async function init() {
   initPromise = (async () => {
     creatureName = await memory.getCreatureName();
     try {
-      await loadRuntime();
-      recognizer = window.createOnlineRecognizer(window.Module);
-      const startWake = WAKE_ENABLED && !!creatureName;
-      console.log(`[ears-onnx] Recognizer ready (creature: ${creatureName || 'none'}, ` +
-                  `wake gate: ${startWake ? 'on' : 'off'})`);
-      await startListening(startWake ? 'wake' : 'active');
+      await startWorker();
+      console.log(`[ears-onnx] Worker ready (creature: ${creatureName || 'none'})`);
+      await startActive();
     } catch (e) {
       console.warn('[ears-onnx] Init failed:', e);
       bus.emit('ear:unavailable');
@@ -75,239 +70,157 @@ export async function setName(name) {
   creatureName = name;
   await memory.setCreatureName(name);
   bus.emit('ami:named', { name });
-  // If wake gate is enabled and we just got a name, start gating.
-  if (WAKE_ENABLED && stage === 'active' && !activeTimer) {
-    enterWake();
-  }
 }
 
 export function getTranscript() {
   const past = history.join(' ');
-  return past + (past && lastPartial ? ' ' : '') + lastPartial;
+  return past + (past && lastInterim ? ' ' : '') + lastInterim;
 }
 export function getStage() { return stage; }
 export function getCreatureName() { return creatureName; }
 
 export function stop() {
-  stopListening();
+  stopActive();
+  if (worker) {
+    try { worker.postMessage({ type: 'stop' }); } catch (e) {}
+    try { worker.terminate(); } catch (e) {}
+    worker = null;
+    workerReady = false;
+  }
   stage = 'off';
 }
 
-// Bypass the wake gate (used by onboarding / first-encounter / manual override).
+// Kept for API compatibility with ears-webspeech.js. With the wake stage
+// stripped, this is a no-op when already active.
 export function forceActive() {
   if (stage === 'off') return;
-  enterActive();
+  // already 'active'
 }
 
-// ── Runtime loader ──
-// sherpa-onnx ships as classic scripts that pollute window globals
-// (Module, createOnlineRecognizer). We inject them once and resolve
-// when Module.onRuntimeInitialized fires.
+// ── Worker lifecycle ──
 
-function loadRuntime() {
+function startWorker() {
   return new Promise((resolve, reject) => {
-    if (window.createOnlineRecognizer && window.Module && window.Module._malloc) {
-      resolve(); return;
-    }
+    const vendorUrl = new URL(VENDOR, window.location.href).href;
 
-    window.Module = {};
-    window.Module.locateFile = (path /* , scriptDir */) => VENDOR + path;
-    window.Module.setStatus = (s) => {
-      const m = s && s.match(/Downloading data\.\.\. \((\d+)\/(\d+)\)/);
-      if (m) {
-        const pct = m[2] === '0' ? 0 : Math.round((Number(m[1]) / Number(m[2])) * 100);
-        console.log(`[ears-onnx] Loading model: ${pct}%`);
+    worker = new Worker(new URL('./ears-worker.js', import.meta.url), { type: 'classic' });
+
+    worker.onmessage = (e) => {
+      const msg = e.data;
+      switch (msg.type) {
+        case 'progress':
+          if (msg.pct === 0 || msg.pct === 100 || msg.pct % 10 === 0) {
+            console.log(`[ears-onnx] Loading model: ${msg.pct}%`);
+          }
+          break;
+        case 'ready':
+          workerReady = true;
+          resolve();
+          break;
+        case 'partial':
+          handlePartial(msg.text);
+          break;
+        case 'sentence':
+          handleSentence(msg.text);
+          break;
+        case 'error':
+          console.warn('[ears-onnx] Worker error:', msg.message);
+          // Non-fatal — worker recreates its stream internally.
+          break;
       }
     };
-    window.Module.onRuntimeInitialized = () => resolve();
-
-    const wrapper = document.createElement('script');
-    wrapper.src = VENDOR + 'sherpa-onnx-asr.js';
-    wrapper.onload = () => {
-      const loader = document.createElement('script');
-      loader.src = VENDOR + 'sherpa-onnx-wasm-main-asr.js';
-      loader.onerror = () => reject(new Error('failed to load wasm loader'));
-      document.head.appendChild(loader);
+    worker.onerror = (err) => {
+      console.error('[ears-onnx] Worker fatal:', err.message || err);
+      reject(new Error(err.message || 'worker error'));
     };
-    wrapper.onerror = () => reject(new Error('failed to load sherpa-onnx-asr.js'));
-    document.head.appendChild(wrapper);
+
+    worker.postMessage({ type: 'init', vendorUrl });
   });
 }
 
-// ── Listening lifecycle ──
+// ── Active stage (capture + forward) ──
 
-async function startListening(initialStage) {
-  if (!recognizer) return;
-  if (stage !== 'off') return;
+async function startActive() {
+  if (!workerReady) return;
+  if (stage === 'active') return;
 
   try {
     audioCtx = new AudioContext({ sampleRate: 16000 });
-    micSampleRate = audioCtx.sampleRate;
+    if (audioCtx.sampleRate !== 16000) {
+      console.warn('[ears-onnx] AudioContext gave', audioCtx.sampleRate,
+                   'Hz; sherpa expects 16000. Audio will be resampled by the browser.');
+    }
+
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     sourceNode = audioCtx.createMediaStreamSource(mediaStream);
 
-    if (!recogStream) recogStream = recognizer.createStream();
+    // AudioWorklet module load is idempotent — safe to call again on restart.
+    await audioCtx.audioWorklet.addModule(
+      new URL('./audio-capture-processor.js', import.meta.url).href
+    );
 
-    const bufSize = 4096;
-    scriptNode = audioCtx.createScriptProcessor(bufSize, 1, 2);
-    scriptNode.onaudioprocess = onAudio;
+    workletNode = new AudioWorkletNode(audioCtx, 'capture-processor', {
+      numberOfInputs: 1,
+      numberOfOutputs: 0,
+    });
 
-    sourceNode.connect(scriptNode);
-    scriptNode.connect(audioCtx.destination);
+    workletNode.port.onmessage = (e) => {
+      // e.data is the Float32Array of samples (transferred from worklet).
+      // Forward straight to the worker, transferring the buffer again.
+      const samples = e.data;
+      if (worker) {
+        worker.postMessage({ type: 'audio', samples }, [samples.buffer]);
+      }
+    };
 
-    if (initialStage === 'wake') enterWake();
-    else enterActive();
+    sourceNode.connect(workletNode);
 
+    stage = 'active';
     bus.emit('ear:listening');
+    console.log('[ears-onnx] Active listening (AudioWorklet → Worker pipeline)');
   } catch (e) {
-    if (e && (e.name === 'NotAllowedError' || e.message?.includes('permission'))) {
+    if (e && (e.name === 'NotAllowedError' || (e.message || '').includes('permission'))) {
       bus.emit('ear:denied');
     } else {
       bus.emit('ear:unavailable');
     }
-    console.warn('[ears-onnx] startListening failed:', e);
+    console.warn('[ears-onnx] startActive failed:', e);
     throw e;
   }
 }
 
-function stopListening() {
-  clearActiveTimer();
-  try { if (sourceNode && scriptNode) sourceNode.disconnect(scriptNode); } catch (e) {}
-  try { if (scriptNode) scriptNode.disconnect(); } catch (e) {}
+function stopActive() {
+  try { if (sourceNode && workletNode) sourceNode.disconnect(workletNode); } catch (e) {}
+  try { if (workletNode) { workletNode.port.onmessage = null; workletNode.disconnect(); } } catch (e) {}
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   if (audioCtx)    { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
-  scriptNode = null;
+  workletNode = null;
   sourceNode = null;
 }
 
-// ── Stage transitions ──
+// ── Result handlers ──
 
-function enterWake() {
-  stage = 'wake';
-  clearActiveTimer();
-  console.log('[ears-onnx] → wake (waiting for creature name)');
+function handlePartial(text) {
+  const norm = normalize(text);
+  if (!norm || norm === lastInterim) return;
+  lastInterim = norm;
+  bus.emit('ear:interim', norm);
+  bus.emit('ear:transcript', getDisplayTranscript());
 }
 
-function enterActive() {
-  stage = 'active';
-  resetActiveTimer();
-  console.log('[ears-onnx] → active (full listening)');
-}
-
-function resetActiveTimer() {
-  clearActiveTimer();
-  if (!WAKE_ENABLED || !creatureName) return; // no wake gate to return to
-  activeTimer = setTimeout(() => {
-    activeTimer = null;
-    if (stage === 'active') enterWake();
-  }, ACTIVE_TIMEOUT_MS);
-}
-
-function clearActiveTimer() {
-  if (activeTimer) { clearTimeout(activeTimer); activeTimer = null; }
-}
-
-// Substring match on lowercased transcript.
-// Avoids the v2 fuzzy-matching false positives — exact name only.
-function containsWakeWord(text) {
-  if (!creatureName || !text) return false;
-  return text.toLowerCase().includes(creatureName.toLowerCase());
-}
-
-// ── Audio pump ──
-
-function onAudio(e) {
-  let samples = new Float32Array(e.inputBuffer.getChannelData(0));
-  if (micSampleRate !== 16000) samples = downsample(samples, micSampleRate, 16000);
-
-  let result = '';
-  let isEndpoint = false;
-  try {
-    recogStream.acceptWaveform(16000, samples);
-    while (recognizer.isReady(recogStream)) recognizer.decode(recogStream);
-    result = recognizer.getResult(recogStream).text || '';
-    isEndpoint = recognizer.isEndpoint(recogStream);
-    consecutiveErrors = 0;
-  } catch (err) {
-    consecutiveErrors++;
-    if (consecutiveErrors === 1) {
-      const heap = window.Module && window.Module.HEAPF32;
-      console.warn('[ears-onnx] acceptWaveform/decode failed:',
-                   { error: err.message,
-                     samplesLen: samples.length,
-                     heapLen: heap ? heap.length : '?',
-                     heapBufLen: heap && heap.buffer ? heap.buffer.byteLength : '?',
-                     wasmMemBufLen: window.Module && window.Module.wasmMemory
-                       ? window.Module.wasmMemory.buffer.byteLength : '?' });
-    }
-    if (consecutiveErrors >= ERROR_RESET_THRESHOLD) {
-      console.warn(`[ears-onnx] ${consecutiveErrors} errors — recreating recogStream`);
-      try { recogStream && recogStream.free && recogStream.free(); } catch (e) {}
-      try {
-        recogStream = recognizer.createStream();
-        consecutiveErrors = 0;
-        lastPartial = '';
-      } catch (e) {
-        console.error('[ears-onnx] stream recreation failed:', e);
-      }
-    }
-    return;
-  }
-
-  // Wake-stage early exit on partials: detect the name in the live partial
-  // so we don't have to wait for the full sentence endpoint to wake up.
-  if (stage === 'wake' && result && result !== lastPartial) {
-    lastPartial = result;
-    const partial = normalize(result);
-    if (containsWakeWord(partial)) {
-      bus.emit('ami:wake', { name: creatureName });
-      enterActive();
-      // Fall through to the endpoint logic so this same utterance still
-      // gets routed to intent classification once it finalizes.
-    }
-    // Do NOT emit ear:interim while still in wake mode — keeps the dev
-    // panel quiet and prevents intents firing on un-woken speech.
-  } else if (stage === 'active' && result && result !== lastPartial) {
-    lastPartial = result;
-    const interim = normalize(result);
-    bus.emit('ear:interim', interim);
-    bus.emit('ear:transcript', getDisplayTranscript());
-  }
-
-  if (isEndpoint) {
-    if (lastPartial) {
-      const sentence = normalize(lastPartial);
-      if (sentence) {
-        // In wake stage, only emit if the name was in the sentence.
-        const shouldEmit =
-          stage === 'active' ||
-          (stage === 'wake' && containsWakeWord(sentence));
-
-        if (shouldEmit) {
-          // Late wake check: a wake-then-command sentence ("dodo, play game")
-          // arrives here while still tagged 'wake' if the partial-stage
-          // detection didn't fire (e.g. name embedded mid-sentence).
-          if (stage === 'wake') {
-            bus.emit('ami:wake', { name: creatureName });
-            enterActive();
-          }
-          history.push(sentence);
-          while (history.length > MAX_HISTORY) history.shift();
-          bus.emit('ear:sentence', sentence);
-          bus.emit('ear:transcript', getDisplayTranscript());
-          resetActiveTimer();
-        }
-      }
-    }
-    try { recognizer.reset(recogStream); } catch (e) {}
-    lastPartial = '';
-  }
+function handleSentence(text) {
+  const sentence = normalize(text);
+  if (!sentence) return;
+  history.push(sentence);
+  while (history.length > MAX_HISTORY) history.shift();
+  bus.emit('ear:sentence', sentence);
+  bus.emit('ear:transcript', getDisplayTranscript());
+  lastInterim = '';
 }
 
 function getDisplayTranscript() {
   const past = history.join(' ');
-  const live = lastPartial ? normalize(lastPartial) : '';
-  return past + (past && live ? ' ' : '') + live;
+  return past + (past && lastInterim ? ' ' : '') + lastInterim;
 }
 
 // ── Helpers ──
@@ -315,20 +228,5 @@ function getDisplayTranscript() {
 // LibriSpeech zipformer outputs uppercase with leading space and no
 // punctuation. intent.js / NLU expect normalized lowercase sentences.
 function normalize(text) {
-  return text.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function downsample(buf, fromRate, toRate) {
-  if (fromRate === toRate) return buf;
-  const ratio = fromRate / toRate;
-  const out = new Float32Array(Math.round(buf.length / ratio));
-  let oi = 0, bi = 0;
-  while (oi < out.length) {
-    const next = Math.round((oi + 1) * ratio);
-    let acc = 0, n = 0;
-    for (let i = bi; i < next && i < buf.length; i++) { acc += buf[i]; n++; }
-    out[oi++] = n ? acc / n : 0;
-    bi = next;
-  }
-  return out;
+  return (text || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
