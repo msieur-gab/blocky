@@ -3,8 +3,14 @@
 // Drop-in replacement for ears.js (Web Speech API).
 // Same public API, same bus events.
 //
-// Phase 1: always-active listening only.
-// Phase 2 will add the wake-word stage (sherpa-onnx KWS).
+// Phase 1: streaming ASR via sherpa-onnx WASM (always-active by default).
+// Phase 2: optional wake gate in front of the active stage.
+//
+// Wake gate is JS-side ("does the transcript contain the creature name?")
+// rather than a dedicated KWS model — sherpa-onnx KWS has no published
+// WASM bundle and would require an Emscripten build pipeline. The
+// state machine here is the same shape we'd want with a real KWS model;
+// only the detection strategy differs.
 // ══════════════════════════════════════════
 
 import { bus } from '../utils/events.js';
@@ -16,9 +22,14 @@ import * as memory from './memory.js';
 // Production target is to rebuild the WASM with the 20M streaming zipformer.
 const VENDOR = './assets/sherpa/asr/';
 
+// ── Config ──
+const params = (typeof window !== 'undefined') ? new URLSearchParams(window.location.search) : new URLSearchParams();
+const WAKE_ENABLED = params.get('wake') === 'on';
+const ACTIVE_TIMEOUT_MS = 12000;
+
 // ── Module-scoped state ──
 let creatureName = null;
-let stage = 'off';            // 'off' | 'active'
+let stage = 'off';            // 'off' | 'wake' | 'active'
 let recognizer = null;
 let recogStream = null;
 
@@ -32,9 +43,11 @@ let lastPartial = '';
 const history = [];
 const MAX_HISTORY = 5;
 
-let initPromise = null;       // single-flight script + runtime init
-let consecutiveErrors = 0;    // for stream recovery
+let initPromise = null;
+let consecutiveErrors = 0;
 const ERROR_RESET_THRESHOLD = 3;
+
+let activeTimer = null;       // Phase 2: revert to wake on silence
 
 // ── Public API ──
 
@@ -45,9 +58,10 @@ export async function init() {
     try {
       await loadRuntime();
       recognizer = window.createOnlineRecognizer(window.Module);
-      console.log('[ears-onnx] Recognizer ready (creature name:',
-                  creatureName ? `"${creatureName}"` : 'none', ')');
-      await startActive();
+      const startWake = WAKE_ENABLED && !!creatureName;
+      console.log(`[ears-onnx] Recognizer ready (creature: ${creatureName || 'none'}, ` +
+                  `wake gate: ${startWake ? 'on' : 'off'})`);
+      await startListening(startWake ? 'wake' : 'active');
     } catch (e) {
       console.warn('[ears-onnx] Init failed:', e);
       bus.emit('ear:unavailable');
@@ -61,6 +75,10 @@ export async function setName(name) {
   creatureName = name;
   await memory.setCreatureName(name);
   bus.emit('ami:named', { name });
+  // If wake gate is enabled and we just got a name, start gating.
+  if (WAKE_ENABLED && stage === 'active' && !activeTimer) {
+    enterWake();
+  }
 }
 
 export function getTranscript() {
@@ -71,13 +89,14 @@ export function getStage() { return stage; }
 export function getCreatureName() { return creatureName; }
 
 export function stop() {
-  stopActive();
+  stopListening();
   stage = 'off';
 }
 
+// Bypass the wake gate (used by onboarding / first-encounter / manual override).
 export function forceActive() {
-  if (stage === 'active') return;
-  startActive();
+  if (stage === 'off') return;
+  enterActive();
 }
 
 // ── Runtime loader ──
@@ -115,11 +134,11 @@ function loadRuntime() {
   });
 }
 
-// ── Active stage ──
+// ── Listening lifecycle ──
 
-async function startActive() {
+async function startListening(initialStage) {
   if (!recognizer) return;
-  if (stage === 'active') return;
+  if (stage !== 'off') return;
 
   try {
     audioCtx = new AudioContext({ sampleRate: 16000 });
@@ -136,27 +155,63 @@ async function startActive() {
     sourceNode.connect(scriptNode);
     scriptNode.connect(audioCtx.destination);
 
-    stage = 'active';
+    if (initialStage === 'wake') enterWake();
+    else enterActive();
+
     bus.emit('ear:listening');
-    console.log('[ears-onnx] Active listening');
   } catch (e) {
     if (e && (e.name === 'NotAllowedError' || e.message?.includes('permission'))) {
       bus.emit('ear:denied');
     } else {
       bus.emit('ear:unavailable');
     }
-    console.warn('[ears-onnx] startActive failed:', e);
+    console.warn('[ears-onnx] startListening failed:', e);
     throw e;
   }
 }
 
-function stopActive() {
+function stopListening() {
+  clearActiveTimer();
   try { if (sourceNode && scriptNode) sourceNode.disconnect(scriptNode); } catch (e) {}
   try { if (scriptNode) scriptNode.disconnect(); } catch (e) {}
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   if (audioCtx)    { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
   scriptNode = null;
   sourceNode = null;
+}
+
+// ── Stage transitions ──
+
+function enterWake() {
+  stage = 'wake';
+  clearActiveTimer();
+  console.log('[ears-onnx] → wake (waiting for creature name)');
+}
+
+function enterActive() {
+  stage = 'active';
+  resetActiveTimer();
+  console.log('[ears-onnx] → active (full listening)');
+}
+
+function resetActiveTimer() {
+  clearActiveTimer();
+  if (!WAKE_ENABLED || !creatureName) return; // no wake gate to return to
+  activeTimer = setTimeout(() => {
+    activeTimer = null;
+    if (stage === 'active') enterWake();
+  }, ACTIVE_TIMEOUT_MS);
+}
+
+function clearActiveTimer() {
+  if (activeTimer) { clearTimeout(activeTimer); activeTimer = null; }
+}
+
+// Substring match on lowercased transcript.
+// Avoids the v2 fuzzy-matching false positives — exact name only.
+function containsWakeWord(text) {
+  if (!creatureName || !text) return false;
+  return text.toLowerCase().includes(creatureName.toLowerCase());
 }
 
 // ── Audio pump ──
@@ -176,7 +231,6 @@ function onAudio(e) {
   } catch (err) {
     consecutiveErrors++;
     if (consecutiveErrors === 1) {
-      // Log once with full diagnostics; subsequent errors get a count.
       const heap = window.Module && window.Module.HEAPF32;
       console.warn('[ears-onnx] acceptWaveform/decode failed:',
                    { error: err.message,
@@ -200,7 +254,20 @@ function onAudio(e) {
     return;
   }
 
-  if (result && result !== lastPartial) {
+  // Wake-stage early exit on partials: detect the name in the live partial
+  // so we don't have to wait for the full sentence endpoint to wake up.
+  if (stage === 'wake' && result && result !== lastPartial) {
+    lastPartial = result;
+    const partial = normalize(result);
+    if (containsWakeWord(partial)) {
+      bus.emit('ami:wake', { name: creatureName });
+      enterActive();
+      // Fall through to the endpoint logic so this same utterance still
+      // gets routed to intent classification once it finalizes.
+    }
+    // Do NOT emit ear:interim while still in wake mode — keeps the dev
+    // panel quiet and prevents intents firing on un-woken speech.
+  } else if (stage === 'active' && result && result !== lastPartial) {
     lastPartial = result;
     const interim = normalize(result);
     bus.emit('ear:interim', interim);
@@ -211,10 +278,25 @@ function onAudio(e) {
     if (lastPartial) {
       const sentence = normalize(lastPartial);
       if (sentence) {
-        history.push(sentence);
-        while (history.length > MAX_HISTORY) history.shift();
-        bus.emit('ear:sentence', sentence);
-        bus.emit('ear:transcript', getDisplayTranscript());
+        // In wake stage, only emit if the name was in the sentence.
+        const shouldEmit =
+          stage === 'active' ||
+          (stage === 'wake' && containsWakeWord(sentence));
+
+        if (shouldEmit) {
+          // Late wake check: a wake-then-command sentence ("dodo, play game")
+          // arrives here while still tagged 'wake' if the partial-stage
+          // detection didn't fire (e.g. name embedded mid-sentence).
+          if (stage === 'wake') {
+            bus.emit('ami:wake', { name: creatureName });
+            enterActive();
+          }
+          history.push(sentence);
+          while (history.length > MAX_HISTORY) history.shift();
+          bus.emit('ear:sentence', sentence);
+          bus.emit('ear:transcript', getDisplayTranscript());
+          resetActiveTimer();
+        }
       }
     }
     try { recognizer.reset(recogStream); } catch (e) {}
