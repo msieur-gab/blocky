@@ -1,3 +1,4 @@
 output/
-assets/sherpa/**/*.wasm
-assets/sherpa/**/*.data
+# The 190 MB model is over GitHub's 100 MB limit per file. The engine (.wasm) and the
+# 70 MB English model are in git, so that the deployed page can hear.
+assets/sherpa/asr/sherpa-onnx-wasm-main-asr.data
