@@ -68,7 +68,15 @@ If you'd rather host blocky on a local server (Flask transmitter, future), edit 
 
 ---
 
+## When the page can't load
+
+If blocky is loaded from a URL and the network is down, the kiosk retries once from the WebView's HTTP cache. If nothing is cached it shows a plain black screen instead of the browser's error page, and tries the network again every 15 seconds.
+
+---
+
 ## Security notes
+
+- Camera and microphone are granted to the page only on the origin blocky was loaded from (the configured URL, or where it redirected to on load). Any other origin, and any other resource, is denied and logged to logcat under `BlockyKiosk`. On a phone that is not Device Owner, the page's request waits for the Android permission prompt instead of failing.
 
 - PIN: 6 digits, PBKDF2-HMAC-SHA256 (120k iterations), 256-bit derived key. Salt + hash stored in `EncryptedSharedPreferences` (hardware-backed Keystore on API 23+). Lockout after 3 / 6 / 9 failed attempts (30s / 5min / 1h).
 - No network calls of any kind from the kiosk launcher itself. The WebView does whatever blocky does.
