@@ -41,7 +41,7 @@ let grid = null;          // { small, smallCtx, lines } working canvases for the
 // These say what those three numbers are drawn as, so the whole face can be re-proportioned at once.
 // Values chosen by Gab in workbench/face-tuner.html, 2026-10-07.
 
-const PROPORTIONS = { eyeW: 140, eyeH: 250, gap: 460, zoom: 1.4, symbol: 1, stroke: 1, mouth: 1.5 };
+const PROPORTIONS = { eyeW: 140, eyeH: 250, gap: 400, zoom: 1.4, symbol: 1, stroke: 1, mouth: 1.5 };
 const prop = { ...PROPORTIONS };
 const wide = () => prop.eyeW / 100;
 const tall = () => prop.eyeH / 200;

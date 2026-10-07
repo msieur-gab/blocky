@@ -24,6 +24,7 @@
             android:name=".KioskActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.AmibKiosk"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode"
             android:resizeableActivity="false">
