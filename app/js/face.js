@@ -43,6 +43,17 @@ let breathPhase = 0;
 // Micro-drift — eyes never perfectly still
 let driftPhase = Math.random() * 100;
 
+// Jelly — a damped spring that squashes/stretches the eyes on every change of mood.
+// jelly > 0 = squashed (wider, shorter), < 0 = stretched (taller, thinner).
+let jelly = 0;
+let jellyV = 0;
+const JELLY_K = 220;   // stiffness  (~2.4 Hz wobble)
+const JELLY_C = 9;     // damping    (settles in ~0.5 s, one visible rebound)
+
+// Shape morph — symbols, digits, game pieces don't snap: the eyes close and reopen as the new shape.
+let morphAmt = 0;      // 0 = open, 1 = shut
+let morphPhase = 0;    // 0 idle · 1 closing · 2 opening
+
 // Gaze — autonomous look direction, independent from expression
 let gazeX = 0;         // current gaze offset (-1 to 1)
 let gazeY = 0;
@@ -101,6 +112,9 @@ function onCanvasTap(e) {
 }
 
 export function setTheme(dark) { darkTheme = dark; }
+
+// Give the eyes a jolt. Positive squashes, negative stretches (surprise).
+export function kick(impulse = 1.4) { jellyV += impulse; }
 export function setAudioRms(rms) { audioRms = rms; }
 export function setScanning(on) { scanning = on; }
 
@@ -154,9 +168,10 @@ function easedLerp(current, target, speed, dt) {
   return lerp(current, target, easedFactor(speed, dt));
 }
 
-function lerpObj(current, target, speed, dt) {
+function lerpObj(current, target, speed, dt, skip) {
   const f = easedFactor(speed, dt);
   for (const k of Object.keys(target)) {
+    if (skip && skip.includes(k)) continue;
     if (typeof target[k] === 'number' && typeof current[k] === 'number') {
       current[k] = lerp(current[k], target[k], f);
     } else {
@@ -172,13 +187,40 @@ export function update(dt, target) {
   // Eyes/mouth: smooth (6). Face transforms: snappy (12) so nods/shakes land.
   // Support both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
   face.eyeGap = easedLerp(face.eyeGap, target.gap ?? target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
-  lerpObj(face.leftEye, target.left ?? target.leftEye, 6, dt);
-  lerpObj(face.rightEye, target.right ?? target.rightEye, 6, dt);
+  const tL = target.left ?? target.leftEye;
+  const tR = target.right ?? target.rightEye;
+  lerpObj(face.leftEye, tL, 6, dt, ['shape']);
+  lerpObj(face.rightEye, tR, 6, dt, ['shape']);
   lerpObj(face.mouth, target.mouth, 6, dt);
   lerpObj(face.face, target.face, 12, dt);
 
-  // Blink — single (70%) or double (30%), disabled during scan
-  if (scanAmt < 0.5) {
+  // Shape morph: close, swap the shape while shut, reopen with a little stretch
+  const wantL = tL.shape ?? null, wantR = tR.shape ?? null;
+  const shapeDiffers = wantL !== (face.leftEye.shape ?? null) || wantR !== (face.rightEye.shape ?? null);
+  if (shapeDiffers && morphPhase !== 1) morphPhase = 1;
+  if (morphPhase === 1) {
+    morphAmt = Math.min(1, morphAmt + dt * 14);          // ~70 ms to shut
+    if (morphAmt >= 1) {
+      face.leftEye.shape = wantL;
+      face.rightEye.shape = wantR;
+      morphPhase = 2;
+      kick(-1.6);
+    }
+  } else if (morphPhase === 2) {
+    morphAmt = Math.max(0, morphAmt - dt * 9);           // ~110 ms to reopen
+    if (morphAmt <= 0) morphPhase = 0;
+  }
+
+  // Jelly spring (sub-stepped so it behaves the same at any frame rate)
+  for (let t = dt; t > 0; t -= 1 / 120) {
+    const h = Math.min(t, 1 / 120);
+    jellyV += (-JELLY_K * jelly - JELLY_C * jellyV) * h;
+    jelly += jellyV * h;
+  }
+  jelly = clamp(jelly, -0.35, 0.35);
+
+  // Blink — single (70%) or double (30%), disabled during scan and while morphing
+  if (scanAmt < 0.5 && morphPhase === 0) {
     blinkTimer -= dt;
 
     if (blinkPhase === 0) {
@@ -364,18 +406,37 @@ function eyePosition(side, eye, skX, skY) {
   };
 }
 
+// Eyes are drawn on their own layer so lids and brows can be erased out of them cleanly
+let layer = null, layerCtx = null;
+
+function eyeLayer(main) {
+  if (!layer) { layer = document.createElement('canvas'); layerCtx = layer.getContext('2d'); }
+  if (layer.width !== canvas.width || layer.height !== canvas.height) {
+    layer.width = canvas.width; layer.height = canvas.height;
+  }
+  layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+  layerCtx.clearRect(0, 0, layer.width, layer.height);
+  layerCtx.setTransform(main.getTransform());
+  layerCtx.globalAlpha = 1;
+  return layerCtx;
+}
+
 function drawNormalEyes(fg, gap, skX, skY) {
+  const main = ctx;
+  ctx = eyeLayer(main);
   [
     { side: -1, eye: face.leftEye },
     { side:  1, eye: face.rightEye },
   ].forEach(({ side, eye }) => {
     const perspScale = 1 + skX * side * 0.4;
-    const ew = eye.w * scale / 2 * perspScale;
-    let eh = eye.h * scale / 2 * perspScale;
+    const ew = eye.w * scale / 2 * perspScale * (1 + jelly * 0.7);
+    let eh = eye.h * scale / 2 * perspScale * (1 - jelly);
+    const ehOpen = eh;
 
-    // Blink squashes height — but skip if eyes already nearly closed (sleeping)
+    // Blink (or a shape morph) squashes height — but skip if eyes already nearly closed (sleeping)
     const eyeAlreadyClosed = eh < 8 * scale;
-    const blinkScale = eyeAlreadyClosed ? 1 : (1 - blinkAmt * 0.92);
+    const shut = Math.max(blinkAmt * 0.92, morphAmt * 0.95);
+    const blinkScale = eyeAlreadyClosed ? 1 : (1 - shut);
     eh = Math.max(1.5 * scale, eh * blinkScale);
 
     const pos = eyePosition(side, eye, skX, skY);
@@ -423,11 +484,61 @@ function drawNormalEyes(fg, gap, skX, skY) {
       ctx.arcTo(-ew + sb,  eh, -ew + st, -eh, cbl);
       ctx.arcTo(-ew + st, -eh,  ew + st, -eh, ctl);
       ctx.closePath();
+
       ctx.fill();
+      if (eye.brow || eye.lower || eye.upper) {
+        carveEye(eye, side, ew, eh, scale * perspScale * (eh / ehOpen));
+      }
     }
 
     ctx.restore();
   });
+
+  ctx = main;
+  main.save();
+  main.setTransform(1, 0, 0, 1, 0, 0);
+  main.drawImage(layer, 0, 0);   // keeps main's globalAlpha (scan fade)
+  main.restore();
+}
+
+// ── Carving ──
+// Round bites taken out of the pill, in Figma units (same space as w/h):
+//   brow  — a big circle biting the top, deeper on one side.
+//           + = inner corners cut (sulky, cross)   − = outer corners cut (sad, worried)
+//   lower — a disc rising from below: the happy crescent
+//   upper — a heavy lid with a softly curved edge (sleepy, bored, sulky)
+// Everything is round on purpose: no blades, so even "angry" stays friendly.
+
+function carveEye(eye, side, ew, eh, k) {
+  const fullW = ew * 2;
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+
+  const brow = eye.brow || 0;
+  if (Math.abs(brow) > 0.5) {
+    const inner = -side;                       // toward the nose
+    const dir = brow > 0 ? inner : -inner;
+    const R = fullW * 1.1;
+    ctx.beginPath();
+    ctx.arc(dir * (ew + R * 0.15), -eh - R + Math.abs(brow) * k, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if ((eye.lower || 0) > 0.5) {
+    const R = fullW;
+    ctx.beginPath();
+    ctx.arc(0, eh + R - eye.lower * k, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if ((eye.upper || 0) > 0.5) {
+    const R = fullW * 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -eh + eye.upper * k - R, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 // ── Scan eye drawing ──

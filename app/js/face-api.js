@@ -110,6 +110,9 @@ function enterBehavior(name, stepOverrides) {
   const b = BEHAVIORS[name];
   if (!b) { console.warn(`[face-api] Unknown behavior: ${name}`); return; }
 
+  // A change of mood jolts the eyes: + squash, − stretch (behaviors may set `pop`)
+  if (name !== currentBehaviorName) renderer.kick(b.pop ?? 1.4);
+
   currentBehavior = b;
   currentBehaviorName = name;
 

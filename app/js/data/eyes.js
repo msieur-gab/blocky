@@ -9,6 +9,10 @@ export const DEFAULT = {
   tl: 50, tr: 50, br: 50, bl: 50,
   shiftTop: 0, shiftBot: 0,
   tilt: 0, x: 0, y: 0,
+  // Carving (Figma units, see carveEye in face.js) — round bites out of the pill
+  brow: 0,    // + inner corners cut (sulky) · − outer corners cut (sad)
+  lower: 0,   // disc rising from below → happy crescent
+  upper: 0,   // heavy lid from above → sleepy, bored
   shape: null,
 };
 
