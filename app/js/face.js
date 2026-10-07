@@ -380,7 +380,13 @@ function updateBounce(dt) {
 
 // Blink — single (70%) or double (30%), disabled during scan
 function updateBlink(dt) {
-  if (scanAmt >= 0.5 || swapPhase !== 0 || habits.blink === false) return;
+  if (scanAmt >= 0.5 || swapPhase !== 0 || habits.blink === false) {
+    // no blinking now — but a blink caught halfway must still open, not freeze half shut
+    blinkAmt = Math.max(0, blinkAmt - dt * 12);
+    blinkPhase = 0;
+    blinksRemaining = 0;
+    return;
+  }
   blinkTimer -= dt;
 
   if (blinkPhase === 0) {
