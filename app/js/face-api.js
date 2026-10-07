@@ -76,23 +76,19 @@ function mirrorEye(eye) {
 // Target setters
 // ══════════════════════════════════════════
 
-function setEyes(name) {
-  if (!name) return;
+// An eye is either a shared shape, by name, or what differs from the default pill
+function eyeOf(spec) {
+  if (typeof spec === 'string') return EYES[spec];
+  return spec ? { ...EYE_DEFAULT, ...spec } : null;
+}
 
-  // Asymmetric: { left: 'name', right: 'name' }
-  if (typeof name === 'object') {
-    const l = EYES[name.left];
-    const r = EYES[name.right];
-    if (l) Object.assign(target.left, l);
-    if (r) Object.assign(target.right, mirrorEye(r));
-    return;
-  }
-
-  // Symmetric
-  const e = EYES[name];
-  if (!e) return;
-  Object.assign(target.left, e);
-  Object.assign(target.right, mirrorEye(e));
+function setEyes(spec) {
+  if (!spec) return;
+  const pair = typeof spec === 'object' && ('left' in spec || 'right' in spec);
+  const l = eyeOf(pair ? spec.left : spec);
+  const r = eyeOf(pair ? spec.right : spec);
+  if (l) Object.assign(target.left, l);
+  if (r) Object.assign(target.right, mirrorEye(r));
 }
 
 function setMouth(name) {
@@ -378,15 +374,11 @@ export function overrideRaw(obj) {
   currentBehaviorName = null;      // whatever comes next is a new behavior again
   renderer.setHabits({ gaze: 'hold' });
   if (obj) {
-    // Accept both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
-    const l = obj.left || obj.leftEye;
-    const r = obj.right || obj.rightEye;
-    if (l) Object.assign(target.left, l);
-    if (r) Object.assign(target.right, r);
+    if (obj.left) Object.assign(target.left, obj.left);
+    if (obj.right) Object.assign(target.right, obj.right);
     if (obj.mouth) Object.assign(target.mouth, obj.mouth);
     if (obj.face) Object.assign(target.face, obj.face);
     if (obj.gap !== undefined) target.gap = obj.gap;
-    else if (obj.eyeGap !== undefined) target.gap = obj.eyeGap;
   }
 }
 
@@ -414,8 +406,6 @@ export function react(name) {
   }
 }
 
-export function registerReactions() { /* no-op — reactions now in chains.js */ }
-
 // Special modes
 export function startScan() { renderer.setScanning(true); }
 export function stopScan() { renderer.setScanning(false); }
@@ -423,11 +413,9 @@ export function setRadioMode(on, autoPlay) { renderer.setRadioMode(on, autoPlay)
 export function isRadioPlaying() { return renderer.isRadioPlaying(); }
 
 // State queries
-export function getTarget() { return target; }
 export function isIdleBlocked() { return overrideActive || activeChain !== null || chainPhase !== 'none'; }
 export function getCurrentBehavior() { return currentBehaviorName; }
 export function getPhase() { return chainPhase; }
-export function getReactions() { return CHAINS; } // legacy compat
 
 // ══════════════════════════════════════════
 // Update (called from main loop)
@@ -466,7 +454,6 @@ export function init(canvasEl) {
   bus.on('reaction:trigger', react);
   bus.on('expression:override', (name) => name ? override(name) : releaseOverride());
   bus.on('expression:raw', (obj) => obj ? overrideRaw(obj) : releaseOverride());
-  bus.on('reactions:register', () => {}); // no-op
 
   // Start with calm
   enterBehavior('calm');
@@ -482,6 +469,27 @@ export function setProportions(p) { renderer.setProportions(p); }
 export function getProportions() { return renderer.getProportions(); }
 export function lookAt(x, y, seconds) { renderer.lookAt(x, y, seconds); }
 export function emit(sign) { renderer.emit(sign); }
+
+// ── Frame rate ──
+// The face is drawn 30 times a second, not at the screen's 60: it runs all day on a phone,
+// and half the frames is half the work. Call frame(dt) from every animation frame; it draws when due.
+
+let frameGap = 1 / 30;
+let sinceFrame = 0;
+
+export function setFrameRate(fps) { frameGap = 1 / clampFps(fps); }
+export function getFrameRate() { return Math.round(1 / frameGap); }
+function clampFps(fps) { return Math.max(5, Math.min(120, fps || 30)); }
+
+export function frame(dt) {
+  sinceFrame += dt;
+  if (sinceFrame < frameGap - 0.002) return false;
+  const step = Math.min(sinceFrame, 0.1);
+  sinceFrame = 0;
+  update(step);
+  render(step);
+  return true;
+}
 
 export function render(dt) {
   // Apply gesture offset to face target before rendering

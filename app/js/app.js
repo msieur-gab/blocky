@@ -264,8 +264,7 @@ function loop(now) {
   kernel.update(dt, sensors.state);
 
   // Face API: mood → reaction → override → render
-  faceApi.update(dt);
-  faceApi.render(dt);
+  faceApi.frame(dt);
 
   // Dev UI at lower rate
   frameCount++;

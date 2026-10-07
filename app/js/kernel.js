@@ -86,7 +86,6 @@ export function register(skill) {
   if (skill.id === 'presence') presenceSkill = skill;
 
   // Legacy: register reactions from skill (no-op in new system)
-  if (skill.reactions) faceApi.registerReactions(skill.reactions);
   if (skill.exemplars) nlu.addExemplars(skill.exemplars);
 
   // Register skill in memory

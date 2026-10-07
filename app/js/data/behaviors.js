@@ -4,7 +4,11 @@
 // References eyes, mouths, and sounds by name
 //
 // Format:
-//   eyes: string           — eye shape name (or { left, right } for asymmetric)
+//   eyes: object | string  — the eye itself, as what differs from a plain pill:
+//                              { h: 180, lidBot: 0.45 }                 both eyes
+//                              { left: { … }, right: { … } }            one each (the right one is mirrored)
+//                            or the name of a shared shape in eyes.js ('heart', 'drowsy', 'awake')
+//                            fields: w h tilt lidTop lidBot slant … (see eyes.js DEFAULT)
 //   mouth: string          — mouth name (optional, defaults to 'none')
 //   face: object           — face transform (optional)
 //   sound: string          — sound to play on enter (optional)
@@ -39,14 +43,14 @@ export const catalog = {
 
   happy: {
     jolt: 0.12,
-    eyes: 'happy',
+    eyes: { h: 180, lidBot: 0.45 },
     mouth: 'smile',
     face: { scale: 1.02 },
   },
 
   sad: {
     habits: { gaze: 'down', emit: { sign: 'tear', every: [2500, 5000] } },
-    eyes: { left: 'sad', right: 'sad' },
+    eyes: { h: 170, tilt: 6, lidTop: 0.12, slant: -14 },
     mouth: 'frown',
     face: { y: 4, scale: 0.97 },
   },
@@ -54,7 +58,7 @@ export const catalog = {
   scared: {
     jolt: -0.14,
     habits: { gaze: 'dart' },
-    eyes: 'scared',
+    eyes: { w: 95, h: 215, slant: -8 },
     mouth: 'open_small',
     face: { scale: 0.90, y: -4 },
     gap: 480,
@@ -62,7 +66,7 @@ export const catalog = {
 
   excited: {
     jolt: -0.1,
-    eyes: 'excited',
+    eyes: { w: 106, h: 205, lidBot: 0.22 },
     mouth: 'smile',
     face: { scale: 1.08 },
     gap: 440,
@@ -71,14 +75,14 @@ export const catalog = {
   bored: {
     jolt: 0.05,
     habits: { gaze: 'down' },
-    eyes: 'bored',
+    eyes: { h: 170, lidTop: 0.5 },
     face: { y: 10, scale: 0.96 },
   },
 
   angry: {
     jolt: 0.16,
     habits: { gaze: 'aside', emit: { sign: 'puff', every: [2800, 4800] } },
-    eyes: { left: 'angry', right: 'angry' },
+    eyes: { w: 108, h: 150, lidTop: 0.14, slant: 18 },
     mouth: 'line_down',
     face: { scale: 1.04 },
     gap: 360,
@@ -87,7 +91,7 @@ export const catalog = {
   surprise: {
     jolt: -0.18,
     habits: { gaze: 'hold', blink: false },
-    eyes: 'surprise',
+    eyes: { w: 108, h: 228 },
     mouth: 'open_medium',
     face: { scale: 1.10, y: -4 },
     sound: 'chirp_up',
@@ -98,25 +102,25 @@ export const catalog = {
 
   curious: {
     habits: { gaze: 'up', signs: ['question'] },
-    eyes: { left: 'curious_l', right: 'curious_r' },
+    eyes: { left: { h: 210, tilt: -5 }, right: { h: 168, tilt: 8, lidTop: 0.12 } },
     face: { tilt: 5 },
   },
 
   curious_b: {
     habits: { gaze: 'up', signs: ['question'] },
-    eyes: { left: 'curious_r', right: 'curious_l' },
+    eyes: { left: { h: 168, tilt: 8, lidTop: 0.12 }, right: { h: 210, tilt: -5 } },
     face: { tilt: -5 },
   },
 
   thinking: {
     habits: { gaze: 'up', signs: ['dots'] },
-    eyes: { left: 'thinking_l', right: 'thinking_r' },
+    eyes: { left: { h: 180, lidTop: 0.22 }, right: { h: 204, tilt: 5 } },
     mouth: 'line_small',
     face: { tilt: 8 },
   },
 
   attentive: {
-    eyes: { left: 'attentive_l', right: 'attentive_r' },
+    eyes: { left: { h: 195, tilt: 3 }, right: { h: 185, tilt: -5 } },
     face: {},
   },
 
@@ -124,7 +128,7 @@ export const catalog = {
 
   silly: {
     habits: { signs: ['blush'] },
-    eyes: { left: 'silly_l', right: 'silly_r' },
+    eyes: { left: { h: 180, tilt: 10, lidBot: 0.32 }, right: { h: 160, tilt: -6, lidBot: 0.4 } },
     mouth: 'smile_big',
     face: { tilt: -4, scale: 1.03 },
     gap: 420,
@@ -132,14 +136,14 @@ export const catalog = {
 
   love: {
     habits: { signs: ['blush'], emit: { sign: 'heart', every: [900, 1800] } },
-    eyes: 'love',
+    eyes: { h: 175, lidBot: 0.35 },
     mouth: 'three',
     face: { scale: 1.04 },
   },
 
   embarrassed: {
     habits: { gaze: 'down', signs: ['blush'] },
-    eyes: 'embarrassed',
+    eyes: { h: 150, lidTop: 0.15, lidBot: 0.4 },
     mouth: 'zigzag',
     face: { scale: 0.95, y: 4 },
   },
@@ -147,7 +151,7 @@ export const catalog = {
   shocked: {
     jolt: -0.22,
     habits: { gaze: 'hold', blink: false },
-    eyes: 'shocked',
+    eyes: { w: 114, h: 238 },
     mouth: 'open_big',
     face: { scale: 1.12, y: -6 },
     gap: 380,
@@ -155,13 +159,13 @@ export const catalog = {
 
   suspicious: {
     habits: { gaze: 'dart' },
-    eyes: { left: 'suspicious_l', right: 'suspicious_r' },
+    eyes: { left: { h: 170, lidTop: 0.52, slant: 8 }, right: { h: 170, lidTop: 0.34, slant: 4 } },
     mouth: 'line_down',
     face: { tilt: -3 },
   },
 
   determined: {
-    eyes: { left: 'determined', right: 'determined' },
+    eyes: { h: 165, lidTop: 0.1, slant: 14 },
     mouth: 'line_flat',
     face: { scale: 1.06 },
     gap: 380,
@@ -169,14 +173,14 @@ export const catalog = {
 
   worried: {
     habits: { gaze: 'down', emit: { sign: 'sweat', every: [2500, 4500] } },
-    eyes: { left: 'worried', right: 'worried' },
+    eyes: { h: 160, tilt: 4, slant: -12 },
     mouth: 'frown_small',
     face: { scale: 0.96, y: 6 },
   },
 
   annoyed: {
     habits: { gaze: 'aside' },
-    eyes: { left: 'annoyed', right: 'annoyed' },
+    eyes: { h: 155, lidTop: 0.45, slant: 10 },
     mouth: 'line_down',
     gap: 390,
   },
@@ -184,12 +188,12 @@ export const catalog = {
   sleepy: {
     jolt: 0.04,
     habits: { gaze: 'down', droop: true },
-    eyes: 'sleepy',
+    eyes: { h: 180, lidTop: 0.48 },
     face: { y: 8, scale: 0.95 },
   },
 
   wink: {
-    eyes: { left: 'wink_closed', right: 'awake' },
+    eyes: { left: { h: 130, lidBot: 0.5 }, right: 'awake' },
     mouth: 'smile',
     face: { tilt: -3 },
   },
@@ -199,7 +203,7 @@ export const catalog = {
   petted: {
     jolt: 0.08,
     habits: { gaze: 'hold', blink: false, signs: ['blush'], emit: { sign: 'heart', every: [700, 1300] } },
-    eyes: 'petted',
+    eyes: { h: 150, lidBot: 0.6 },
     mouth: 'smile',
     face: { scale: 1.03, y: 4 },
     sound: 'hum_happy',
@@ -244,7 +248,7 @@ export const catalog = {
   // ── Yawn ──
 
   yawning: {
-    eyes: 'yawn',
+    eyes: { h: 130, lidTop: 0.2, lidBot: 0.25 },
     mouth: 'yawn',
     face: { scale: 1.04 },
     sound: 'yawn_sound',

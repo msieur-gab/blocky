@@ -16,13 +16,6 @@ import { DEFAULT as DEFAULT_EYE } from './data/eyes.js';
 import { DEFAULT as DEFAULT_MOUTH } from './data/mouths.js';
 
 const DEFAULT_FACE = { x: 0, y: 0, scale: 1, tilt: 0, squash: 0, skewX: 0, skewY: 0 };
-const NEUTRAL = {
-  eyeGap: 400, gap: 400,
-  leftEye: { ...DEFAULT_EYE }, left: { ...DEFAULT_EYE },
-  rightEye: { ...DEFAULT_EYE }, right: { ...DEFAULT_EYE },
-  mouth: { ...DEFAULT_MOUTH },
-  face: { ...DEFAULT_FACE },
-};
 
 let canvas, ctx;
 let W, H, cx, cy, scale;
@@ -34,7 +27,7 @@ const DARK  = { fg: '#C6F3E5', bg: '#0B1110' };
 const LIGHT = { fg: '#28261f', bg: '#f0efe8' };
 let palette = null;       // { fg, bg } overrides the theme
 let gridCells = 0;        // pixel grid: cells along the short side of the screen, 0 = smooth
-let grid = null;          // { small, smallCtx, lines } working canvases for the grid
+let grid = null;          // the tiny canvas the pixel grid is painted on, and its cell lines
 
 // ── Proportions ──
 // The catalog is written for an eye 100 wide, 200 high, centres 400 apart.
@@ -50,7 +43,7 @@ const gapNow = () => face.eyeGap * prop.gap / 400;
 // ── Interpolated state ──
 
 const face = {
-  eyeGap: NEUTRAL.eyeGap,
+  eyeGap: 400,
   leftEye:  { ...DEFAULT_EYE },
   rightEye: { ...DEFAULT_EYE },
   mouth:    { ...DEFAULT_MOUTH },
@@ -121,8 +114,6 @@ let petting = false;
 let petHandler = null;
 let tapQuietUntil = 0;
 
-// External
-let audioRms = 0;
 
 // ── Init ──
 
@@ -207,7 +198,6 @@ export function setPalette(p) { palette = p && p.fg && p.bg ? { fg: p.fg, bg: p.
 export function setPixelGrid(cells) { gridCells = Math.max(0, cells | 0); }
 export function setProportions(p) { Object.assign(prop, p || PROPORTIONS); resize(); }
 export function getProportions() { return { ...prop }; }
-export function setAudioRms(rms) { audioRms = rms; }
 export function setScanning(on) { scanning = on; }
 export function setHead(h) { head = h; }
 
@@ -314,10 +304,9 @@ export function update(dt, target) {
 
   // Eased interpolation everywhere — ease-out cubic
   // Eyes/mouth: smooth (6). Face transforms: snappy (12) so nods/shakes land.
-  // Support both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
-  const tL = target.left ?? target.leftEye;
-  const tR = target.right ?? target.rightEye;
-  face.eyeGap = easedLerp(face.eyeGap, target.gap ?? target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
+  const tL = target.left;
+  const tR = target.right;
+  face.eyeGap = easedLerp(face.eyeGap, target.gap, 6, dt);
   lerpObj(face.leftEye, tL, 6, dt);
   lerpObj(face.rightEye, tR, 6, dt);
   lerpObj(face.mouth, target.mouth, 6, dt);
@@ -514,9 +503,23 @@ function line(width) {
 
 export function draw() {
   if (!ctx) return;
-  ctx.clearRect(0, 0, W, H);
-
   const { fg, bg } = colors();
+
+  if (!gridCells) { paint(fg, bg); return; }
+
+  // Pixel grid: the face is painted straight onto a tiny canvas, one canvas pixel per cell,
+  // so there is never a big picture to read back. Then each cell is made fully on or off.
+  const main = ctx;
+  const small = pixelCanvas();
+  ctx = small.ctx;
+  ctx.setTransform(small.cols / W, 0, 0, small.rows / H, 0, 0);
+  paint(fg, bg);
+  ctx = main;
+  showPixels(small, fg, bg);
+}
+
+function paint(fg, bg) {
+  ctx.clearRect(0, 0, W, H);
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
@@ -619,8 +622,6 @@ export function draw() {
   }
 
   ctx.restore();
-
-  if (gridCells) drawPixelGrid(fg, bg);
 }
 
 // ── Normal eye drawing ──
@@ -918,37 +919,42 @@ function drawSigns(fg) {
 }
 
 // ── Pixel grid ──
-// The finished picture is shrunk to a coarse grid, every cell becomes fully on or fully off,
-// and it is shown again with hard-edged cells and a thin dark line between them.
+// One canvas pixel per cell; shown enlarged with hard edges and a thin dark line between cells.
 
-function drawPixelGrid(fg, bg) {
-  const cell = Math.min(canvas.width, canvas.height) / gridCells;      // in device pixels
-  const cols = Math.max(1, Math.round(canvas.width / cell));
-  const rows = Math.max(1, Math.round(canvas.height / cell));
-
+function pixelCanvas() {
+  const cell = Math.min(W, H) / gridCells;
+  const cols = Math.max(1, Math.round(W / cell));
+  const rows = Math.max(1, Math.round(H / cell));
   if (!grid) {
     const small = document.createElement('canvas');
-    grid = { small, smallCtx: small.getContext('2d', { willReadFrequently: true }), lines: null, key: '' };
+    grid = { small, ctx: small.getContext('2d', { willReadFrequently: true }), lines: null, key: '' };
   }
   if (grid.small.width !== cols || grid.small.height !== rows) { grid.small.width = cols; grid.small.height = rows; }
+  grid.cols = cols; grid.rows = rows;
+  return grid;
+}
 
-  grid.smallCtx.drawImage(canvas, 0, 0, cols, rows);
-  const image = grid.smallCtx.getImageData(0, 0, cols, rows);
+function showPixels(small, fg, bg) {
+  const { cols, rows } = small;
+
+  // Every cell fully on or fully off
+  const image = small.ctx.getImageData(0, 0, cols, rows);
   const px = new Uint32Array(image.data.buffer);
   const on = rgba(fg), off = rgba(bg);
   const mid = (brightness(on) + brightness(off)) / 2;
   const lit = brightness(on) > brightness(off);
   for (let i = 0; i < px.length; i++) px[i] = (brightness(px[i]) > mid) === lit ? on : off;
-  grid.smallCtx.putImageData(image, 0, 0);
+  small.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  small.ctx.putImageData(image, 0, 0);
 
   // The lines between cells never change for a given size: draw them once
   const key = `${canvas.width}x${canvas.height}/${cols}/${bg}`;
-  if (grid.key !== key) {
-    grid.key = key;
-    grid.lines = document.createElement('canvas');
-    grid.lines.width = canvas.width; grid.lines.height = canvas.height;
-    if (cell >= 4) {
-      const g = grid.lines.getContext('2d');
+  if (small.key !== key) {
+    small.key = key;
+    small.lines = document.createElement('canvas');
+    small.lines.width = canvas.width; small.lines.height = canvas.height;
+    if (canvas.width / cols >= 4) {
+      const g = small.lines.getContext('2d');
       g.fillStyle = bg;
       g.globalAlpha = 0.5;
       for (let c = 1; c < cols; c++) g.fillRect(Math.round(c * canvas.width / cols), 0, 1, canvas.height);
@@ -959,8 +965,8 @@ function drawPixelGrid(fg, bg) {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(grid.small, 0, 0, canvas.width, canvas.height);
-  ctx.drawImage(grid.lines, 0, 0);
+  ctx.drawImage(small.small, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(small.lines, 0, 0);
   ctx.restore();
 }
 

@@ -101,6 +101,12 @@ body.full.menu .controls { display: flex; }
         </div>
         <button class="act" id="btnSound" aria-pressed="false">Sound: off</button>
       </div>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Frames per second">
+          <button data-fps="60">60 fps</button><button data-fps="30">30</button><button data-fps="20">20</button><button data-fps="15">15</button>
+        </div>
+        <span class="caption" id="stats"></span>
+      </div>
     </section>
 
     <section class="panel">
@@ -160,10 +166,10 @@ const SLIDERS = [
   ['stroke', 'Symbol stroke', 0.4, 2,  0.05, 'thickness of drawn lines'],
 ];
 
-const KEY = 'blocky-face-tuner-6';
+const KEY = 'blocky-face-tuner-7';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
-const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', mouth: true, tune: { ...PRESETS.blocky }, ...load() };
+const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', mouth: true, fps: 30, tune: { ...PRESETS.blocky }, ...load() };
 state.tune = { ...TUNE_DEFAULT, ...state.tune };
 state.orient = 'landscape';      // landscape is blocky's face; the app never shows it upright
 
@@ -206,6 +212,8 @@ function apply() {
   api.setPalette(COLORS[state.color]);
   api.setPixelGrid(state.pixel ? GRID : 0);
   setDigitStyle(state.digits);
+  api.setFrameRate(state.fps);
+  document.querySelectorAll('[data-fps]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.fps) === state.fps)));
   api.setProportions({ ...state.tune, mouth: state.mouth ? state.tune.mouth : 0 });
   document.querySelectorAll('[data-pixel]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.pixel === '1') === state.pixel)));
   document.querySelectorAll('[data-color]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === state.color)));
@@ -221,7 +229,8 @@ function exportText() {
   return `// face tuner — ${state.orient}, ${state.pixel ? 'pixel grid' : 'smooth'}, ${state.color}, digits ${state.digits}\n` +
     `faceApi.setProportions({ eyeW: ${t.eyeW}, eyeH: ${t.eyeH}, gap: ${t.gap}, zoom: ${t.zoom}, symbol: ${t.symbol}, stroke: ${t.stroke}, mouth: ${state.mouth ? t.mouth : 0} });\n` +
     `faceApi.setPalette({ fg: '${c.fg}', bg: '${c.bg}' });\n` +
-    `faceApi.setPixelGrid(${state.pixel ? GRID : 0});`;
+    `faceApi.setPixelGrid(${state.pixel ? GRID : 0});\n` +
+    `faceApi.setFrameRate(${state.fps});`;
 }
 
 for (const [k, label, min, max, step, hint] of SLIDERS) {
@@ -234,6 +243,7 @@ document.querySelectorAll('[data-pixel]').forEach(b => b.addEventListener('click
 document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => { state.color = b.dataset.color; apply(); }));
 document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { state.tune = { ...PRESETS[b.dataset.preset] }; apply(); }));
 document.querySelectorAll('[data-digits]').forEach(b => b.addEventListener('click', () => { state.digits = b.dataset.digits; apply(); }));
+document.querySelectorAll('[data-fps]').forEach(b => b.addEventListener('click', () => { state.fps = Number(b.dataset.fps); apply(); }));
 document.querySelectorAll('[data-mouth]').forEach(b => b.addEventListener('click', () => { state.mouth = b.dataset.mouth === '1'; apply(); }));
 
 $('btnSound').addEventListener('click', e => {
@@ -277,10 +287,17 @@ for (const [label, run] of [
   $('moves').appendChild(b);
 }
 
-let last = performance.now();
+let last = performance.now(), drawn = 0, cost = 0, statAt = last;
 function loop(t) {
   const dt = Math.min(0.1, (t - last) / 1000); last = t;
-  api.update(dt); api.render(dt);
+  // draw when a frame is due, and time it: frames really drawn per second, and what each one costs
+  const t0 = performance.now();
+  if (api.frame(dt)) { drawn++; cost += performance.now() - t0; }
+  if (t - statAt >= 1000) {
+    $('stats').textContent = `${drawn} frames/s drawn · ${(cost / Math.max(1, drawn)).toFixed(2)} ms each · ${(cost / (t - statAt) * 100).toFixed(1)} % of the time`;
+    window.tunerStats = { fps: drawn, msPerFrame: cost / Math.max(1, drawn), busy: cost / (t - statAt) };
+    drawn = 0; cost = 0; statAt = t;
+  }
   requestAnimationFrame(loop);
 }
 apply();

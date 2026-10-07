@@ -51,33 +51,6 @@ function digitSize(ctx, w, h) {
 
 export const eyes = {
 
-  // Pill / rounded rectangle (default)
-  pill(ctx, w, h, r) {
-    roundRect(ctx, w, h, Math.min(r, w, h));
-    ctx.fill();
-  },
-
-  // Perfect circle
-  round(ctx, w, h) {
-    const radius = Math.min(w, h);
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-  },
-
-  // Narrow slit
-  narrow(ctx, w, h, r) {
-    roundRect(ctx, w, Math.max(h, 2), Math.min(r, w));
-    ctx.fill();
-  },
-
-  // Upward arc (rainbow) — stroke only
-  arc(ctx, w, h) {
-    ctx.beginPath();
-    ctx.arc(0, h * 0.3, w, Math.PI, 0, false);
-    ctx.stroke();
-  },
-
   // X cross — two diagonal strokes
   cross(ctx, w, h) {
     const s = Math.min(w, h) * 0.8;
@@ -162,28 +135,6 @@ export const eyes = {
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.stroke();
-  },
-
-  // > shape (angle pointing right)
-  angleRight(ctx, w, h) {
-    const hw = w * 0.7;
-    const hh = h * 0.8;
-    ctx.beginPath();
-    ctx.moveTo(-hw, -hh);
-    ctx.lineTo(hw, 0);
-    ctx.lineTo(-hw, hh);
-    ctx.stroke();
-  },
-
-  // < shape (angle pointing left)
-  angleLeft(ctx, w, h) {
-    const hw = w * 0.7;
-    const hh = h * 0.8;
-    ctx.beginPath();
-    ctx.moveTo(hw, -hh);
-    ctx.lineTo(-hw, 0);
-    ctx.lineTo(hw, hh);
     ctx.stroke();
   },
 

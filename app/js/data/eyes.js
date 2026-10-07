@@ -1,5 +1,7 @@
 // ══════════════════════════════════════════
 // Eye Shapes Catalog
+// Shared shapes only: the default pill, sleep, symbols, digits, game pieces.
+// An emotion's own eyes are written in its behavior (behaviors.js).
 // Raw geometry from workbench — no animation, no sound
 // All values in Figma coordinates (w:100 h:200 radii:50 gap:400)
 // ══════════════════════════════════════════
@@ -22,36 +24,6 @@ export const catalog = {
   awake:        { ...DEFAULT },
   calm:         { ...DEFAULT, h: 190 },
 
-  // ── Emotions — pill + lids. One line each; tune them in workbench/face-tuner.html ──
-  happy:        { ...DEFAULT, h: 180, lidBot: 0.45 },
-  sad:          { ...DEFAULT, h: 170, tilt: 6, lidTop: 0.12, slant: -14 },
-  scared:       { ...DEFAULT, w: 95, h: 215, slant: -8 },
-  excited:      { ...DEFAULT, w: 106, h: 205, lidBot: 0.22 },
-  bored:        { ...DEFAULT, h: 170, lidTop: 0.5 },
-  angry:        { ...DEFAULT, w: 108, h: 150, lidTop: 0.14, slant: 18 },
-  surprise:     { ...DEFAULT, w: 108, h: 228 },
-  love:         { ...DEFAULT, h: 175, lidBot: 0.35 },
-  embarrassed:  { ...DEFAULT, h: 150, lidTop: 0.15, lidBot: 0.4 },
-  shocked:      { ...DEFAULT, w: 114, h: 238 },
-  suspicious_l: { ...DEFAULT, h: 170, lidTop: 0.52, slant: 8 },
-  suspicious_r: { ...DEFAULT, h: 170, lidTop: 0.34, slant: 4 },
-  determined:   { ...DEFAULT, h: 165, lidTop: 0.1, slant: 14 },
-  thinking_l:   { ...DEFAULT, h: 180, lidTop: 0.22 },
-  thinking_r:   { ...DEFAULT, h: 204, tilt: 5 },
-  worried:      { ...DEFAULT, h: 160, tilt: 4, slant: -12 },
-  attentive_l:  { ...DEFAULT, h: 195, tilt: 3 },
-  attentive_r:  { ...DEFAULT, h: 185, tilt: -5 },
-  silly_l:      { ...DEFAULT, h: 180, tilt: 10, lidBot: 0.32 },
-  silly_r:      { ...DEFAULT, h: 160, tilt: -6, lidBot: 0.4 },
-  curious_l:    { ...DEFAULT, h: 210, tilt: -5 },
-  curious_r:    { ...DEFAULT, h: 168, tilt: 8, lidTop: 0.12 },
-  annoyed:      { ...DEFAULT, h: 155, lidTop: 0.45, slant: 10 },
-  wink_closed:  { ...DEFAULT, h: 130, lidBot: 0.5 },              // a thick arch at eye level
-  sleepy:       { ...DEFAULT, h: 180, lidTop: 0.48 },             // half shut; `droop` does the rest
-  petted:       { ...DEFAULT, h: 150, lidBot: 0.6 },              // two happy arches
-  yawn:         { ...DEFAULT, h: 130, lidTop: 0.2, lidBot: 0.25 },
-
-  // ── Drowsy / Sleep (workbench-designed by Gab) ──
   // Falling asleep: a heavy lid leaning toward the ears, opening and giving in
   // (the earlier slanted-pill versions are in git history)
   drowsy:       { ...DEFAULT, h: 180, lidTop: 0.5,  slant: -8 },
