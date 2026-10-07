@@ -1,10 +1,11 @@
 # blocky
 
-A small creature that keeps a child company on a donated phone. Two halves:
+A small creature that keeps a child company on a donated phone. One repository
+(`msieur-gab/blocky`, branch `main`), two halves:
 
 | Folder | What it is |
 |---|---|
-| `app/` | The blocky web app. Git repo, branch `v3/on-device-stt`. Open `index.html` through any static server; add `?stt=onnx` for on-device speech (sherpa-onnx). |
+| `app/` | The blocky web app. Open `index.html` through any static server; add `?stt=onnx` for on-device speech (sherpa-onnx). |
 | `kiosk/` | The Android lock that pins a phone to blocky (Kotlin, system WebView, Device Owner lock task, PIN, wipe between children). See `kiosk/README.md`. |
 
 ## Where this came from (assembled 2026-10-07)
@@ -20,6 +21,10 @@ A small creature that keeps a child company on a donated phone. Two halves:
   adapted from the symbios Android wrapper (see `kiosk/README.md`, "When the page can't load"
   and "Security notes"); they compile but have not been run on a phone yet.
 - The untouched originals are in `~/dev/archive_blocky/`.
+- Not in git: the sherpa-onnx `.wasm` and `.data` files under `app/assets/sherpa/`
+  (about 190 MB, ignored). A fresh clone needs them copied in before `?stt=onnx` works.
+- The older branches (`master`, `feature/rps-game`, `v2/architecture`, `v3/face-system`,
+  `v3/on-device-stt`) predate the move into `app/` and keep the flat layout.
 
 ## Known stale spots
 
