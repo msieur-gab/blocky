@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════
 
 import * as tokenizer from './tokenizer.js';
+import { themes } from '../data/talk.js';
 
 const MODEL_PATH = 'assets/models/minilm-quantized.onnx';
 const EMBED_DIM = 384;
@@ -188,6 +189,11 @@ const INTENT_EXEMPLARS = {
   ],
 };
 
+// Small-talk themes (data/talk.js) are intents like the others
+for (const [theme, { phrases }] of Object.entries(themes)) {
+  INTENT_EXEMPLARS[theme] = [...(INTENT_EXEMPLARS[theme] || []), ...phrases];
+}
+
 // Pre-computed embeddings: { intent: Float32Array[] }
 let exemplarEmbeddings = {};
 
@@ -265,7 +271,8 @@ function l2Normalize(vec) {
 
 // ── Classification ──
 
-export function classify(embedding) {
+// The closest intent, however far it is
+export function nearest(embedding) {
   let bestIntent = null;
   let bestScore = -1;
 
@@ -279,11 +286,12 @@ export function classify(embedding) {
     }
   }
 
-  if (bestScore >= MATCH_THRESHOLD) {
-    return { intent: bestIntent, confidence: bestScore };
-  }
+  return { intent: bestIntent, confidence: bestScore };
+}
 
-  return null;
+export function classify(embedding) {
+  const best = nearest(embedding);
+  return best.confidence >= MATCH_THRESHOLD ? best : null;
 }
 
 function cosine(a, b) {
@@ -303,20 +311,69 @@ export async function init() {
     return;
   }
 
+  // The exemplars only change when the code does: what was computed last time is kept
+  // and read back, instead of running the model 160 times at every start.
+  const kept = readKept();
+  if (kept) {
+    exemplarEmbeddings = kept;
+    const count = Object.values(kept).reduce((s, a) => s + a.length, 0);
+    console.log(`[nlu] Ready — ${count} exemplars read back from last time`);
+    return;
+  }
+
   console.log('[nlu] Pre-embedding intent exemplars...');
   const t0 = performance.now();
 
+  const fresh = {};
   for (const [intent, phrases] of Object.entries(INTENT_EXEMPLARS)) {
-    exemplarEmbeddings[intent] = [];
+    fresh[intent] = [];
     for (const phrase of phrases) {
       const emb = await embed(phrase);
-      if (emb) exemplarEmbeddings[intent].push(emb);
+      if (emb) fresh[intent].push(emb);
     }
   }
+  exemplarEmbeddings = fresh;
+  keep(fresh);
 
   const dt = ((performance.now() - t0) / 1000).toFixed(1);
   const count = Object.values(exemplarEmbeddings).reduce((s, a) => s + a.length, 0);
   console.log(`[nlu] Ready — ${count} exemplars embedded in ${dt}s`);
+}
+
+// ── Kept embeddings ──
+// One entry in localStorage, named after the model and the exact phrases. Change a phrase,
+// add a skill or swap the model, and the name no longer matches: everything is computed again.
+
+const KEPT = 'blocky-nlu-exemplars';
+
+function keptName() {
+  const text = MODEL_PATH + JSON.stringify(INTENT_EXEMPLARS);
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return `${text.length}:${h}`;
+}
+
+function keep(embeddings) {
+  try {
+    const intents = {};
+    for (const [intent, list] of Object.entries(embeddings)) {
+      intents[intent] = list.map(v => btoa(String.fromCharCode(...new Uint8Array(v.buffer))));
+    }
+    localStorage.setItem(KEPT, JSON.stringify({ name: keptName(), intents }));
+  } catch (e) { /* no room, or no storage: it will be computed again next time */ }
+}
+
+function readKept() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEPT) || 'null');
+    if (!saved || saved.name !== keptName()) return null;
+    const out = {};
+    for (const [intent, list] of Object.entries(saved.intents)) {
+      out[intent] = list.map(b64 => new Float32Array(Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer));
+      if (out[intent].some(v => v.length !== EMBED_DIM)) return null;
+    }
+    return out;
+  } catch (e) { return null; }
 }
 
 // ── Add exemplars from skills (called by kernel on skill registration) ──

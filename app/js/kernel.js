@@ -48,6 +48,8 @@ function makeContext(skill) {
       stopScan:     () => faceApi.stopScan(),
       setRadioMode: (on, auto) => faceApi.setRadioMode(on, auto),
       isRadioPlaying:() => faceApi.isRadioPlaying(),
+      holdRadio:    (on) => faceApi.holdRadio(on),
+      isBusy:       () => faceApi.isIdleBlocked(),
     },
     voice: {
       play:   (name, dur) => voice.play(name, dur),

@@ -13,7 +13,7 @@
 //
 // Protocol (postMessage):
 //   main → worker:
-//     { type: 'init', vendorUrl }
+//     { type: 'init', vendorUrl, loader, modelType }   loader = the script that carries one model
 //     { type: 'audio', samples (Float32Array, 16kHz mono) }
 //     { type: 'reset' }
 //     { type: 'stop' }
@@ -32,14 +32,51 @@ let lastPartial = '';
 self.onmessage = (e) => {
   const msg = e.data;
   switch (msg.type) {
-    case 'init':   return init(msg.vendorUrl);
+    case 'init':   return init(msg.vendorUrl, msg.loader, msg.modelType);
     case 'audio':  return onAudio(msg.samples);
     case 'reset':  return resetStream();
     case 'stop':   return self.close();
   }
 };
 
-function init(vendorUrl) {
+// The engine's own defaults, with two changes:
+// - modelType is given when known. Left empty, the engine opens the encoder a first time
+//   only to read what kind of model it is, then opens it again to use it: the slowest step
+//   of start-up, done twice.
+// - debug off: it printed the whole configuration and model description at every start.
+function recognizerConfig(modelType) {
+  return {
+    featConfig: { sampleRate: 16000, featureDim: 80 },
+    modelConfig: {
+      transducer: { encoder: './encoder.onnx', decoder: './decoder.onnx', joiner: './joiner.onnx' },
+      paraformer: { encoder: '', decoder: '' },
+      zipformer2Ctc: { model: '' },
+      nemoCtc: { model: '' },
+      toneCtc: { model: '' },
+      tokens: './tokens.txt',
+      numThreads: 1,
+      provider: 'cpu',
+      debug: 0,
+      modelType: modelType || '',
+      modelingUnit: 'cjkchar',
+      bpeVocab: '',
+    },
+    decodingMethod: 'greedy_search',
+    maxActivePaths: 4,
+    enableEndpoint: 1,
+    rule1MinTrailingSilence: 2.4,
+    rule2MinTrailingSilence: 1.2,
+    rule3MinUtteranceLength: 20,
+    hotwordsFile: '',
+    hotwordsScore: 1.5,
+    ctcFstDecoderConfig: { graph: '', maxActive: 3000 },
+    ruleFsts: '',
+    ruleFars: '',
+  };
+}
+
+function init(vendorUrl, loader = 'sherpa-onnx-wasm-main-asr.js', modelType = '') {
+  const t0 = performance.now();
   // Configure the global Module BEFORE importing the wasm loader.
   self.Module = {};
   self.Module.locateFile = (path) => vendorUrl + path;
@@ -52,9 +89,10 @@ function init(vendorUrl) {
   };
   self.Module.onRuntimeInitialized = () => {
     try {
-      recognizer = self.createOnlineRecognizer(self.Module);
+      const t1 = performance.now();
+      recognizer = self.createOnlineRecognizer(self.Module, recognizerConfig(modelType));
       stream = recognizer.createStream();
-      postMessage({ type: 'ready' });
+      postMessage({ type: 'ready', fetchMs: Math.round(t1 - t0), buildMs: Math.round(performance.now() - t1) });
     } catch (err) {
       postMessage({ type: 'error', message: 'recognizer creation: ' + err.message });
     }
@@ -64,7 +102,7 @@ function init(vendorUrl) {
     // Both are classic scripts. importScripts is sync.
     self.importScripts(
       vendorUrl + 'sherpa-onnx-asr.js',
-      vendorUrl + 'sherpa-onnx-wasm-main-asr.js'
+      vendorUrl + loader
     );
   } catch (err) {
     postMessage({ type: 'error', message: 'importScripts: ' + err.message });

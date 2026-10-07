@@ -14,6 +14,7 @@ import * as nlu from './nlu.js';
 
 // Rules are checked in order — MOST SPECIFIC FIRST.
 // Multi-word phrases before single words to prevent "play music" matching "play".
+// A phrase matches whole words only ("mad" is not in "made").
 const RULES = [
   // ── Specific multi-word phrases first ──
 
@@ -24,18 +25,21 @@ const RULES = [
 
   // Story (before generic words)
   { intent: 'story', words: ['tell me a story', 'tell a story', 'story time', 'read me a story',
-    'read me something', 'read to me'] },
+    'read me something', 'read to me', 'bedtime story', 'a story'] },
 
   // Sleep
   { intent: 'sleep', words: ['good night', 'goodnight', 'night night', 'nap time',
     'go to sleep', 'bedtime', 'time to sleep', 'go to bed'] },
 
-  // Play (after music — only matches play without music context)
-  { intent: 'play', words: ['let\'s play', 'play a game', 'wanna play', 'want to play',
-    'play with me', 'rock paper scissors', 'play game'] },
+  // Play (after music) — only the unmistakable phrases. "want to play…" and
+  // "let's play…" go to the NLU, which weighs the rest ("…in the rain")
+  { intent: 'play', words: ['play a game', 'play with me', 'rock paper scissors', 'play game'] },
 
   // Greetings
   { intent: 'greet', words: ['good morning', 'hello', 'wake up', 'hey blocky', 'hi blocky'] },
+
+  // Time (before questions — "what is the time" is not a "what is" question)
+  { intent: 'time', words: ['what time', 'what\'s the time', 'what is the time', 'tell me the time'] },
 
   // ── Single-word / short phrases ──
 
@@ -46,7 +50,7 @@ const RULES = [
   { intent: 'emotion_sad', words: ['miss mommy', 'miss daddy', 'miss my', 'feel sad', 'i\'m sad', 'crying', 'cry'] },
   { intent: 'emotion_scared', words: ['scared', 'afraid', 'monster', 'scary', 'frightened'] },
   { intent: 'emotion_angry', words: ['angry', 'mad', 'hate', 'stupid', 'not fair'] },
-  { intent: 'emotion_happy', words: ['happy', 'yay', 'awesome', 'great', 'funny', 'haha', 'lol', 'cool', 'amazing', 'whoa'] },
+  { intent: 'emotion_happy', words: ['happy', 'yay', 'awesome', 'great', 'funny', 'haha', 'hahaha', 'lol', 'cool', 'amazing', 'whoa'] },
 
   // Questions
   { intent: 'question', words: ['what is', 'what are', 'why is', 'why are', 'how does', 'how do'] },
@@ -56,27 +60,53 @@ const RULES = [
 
   // Secret / fun
   { intent: 'secret', words: ['fart', 'burp', 'poop', 'butt'] },
-
-  // Attention (last — "blocky" appears in many phrases)
-  { intent: 'attention', words: ['blocky'] },
 ];
+
+for (const rule of RULES) {
+  rule.patterns = rule.words.map(w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`));
+}
+
+// A feeling or a wish said with "not" in front is not that one ("i'm not scared"):
+// the rule steps aside and the NLU decides (it has a `negation` intent)
+const NEGATABLE = new Set(['play', 'bored', 'emotion_sad', 'emotion_scared', 'emotion_angry', 'emotion_happy', 'love']);
+const NEGATION = /\bnot\b|n't\b|\bnever\b|\bnobody\b|\bno one\b/;
+
+// The name and nothing else: blocky looks up. With more words around it, the
+// sentence is judged on those words; the name alone decides only if nothing else does.
+const NAME_ALONE = /^(?:hey |oh |ok |okay )?blocky[\s!?.,]*$/;
+const NAME_SAID = /\bblocky\b/;
 
 // ══════════════════════════════════════════
 // Entity extraction (names)
 // ══════════════════════════════════════════
 
+// Said outright: the word that follows is a name.
 const NAME_PATTERNS = [
-  /(?:i'm|i am|my name is|my name's)\s+([a-z]+)/i,
-  /(?:call me|they call me)\s+([a-z]+)/i,
-  /(?:this is|that's|that is)\s+([a-z]+)/i,
-  /(?:it's me)\s*,?\s*([a-z]+)/i,
-  /(?:please meet|meet)\s+([a-z]+)/i,
-  /(?:say hello to|say hi to)\s+([a-z]+)/i,
+  /\b(?:my name is|my name's)\s+([a-z]+)/i,
+  /\b(?:i am|i'm) called\s+([a-z]+)/i,
+  /\b(?:call me|they call me)\s+([a-z]+)/i,
+  /\b(?:it's me)\s*,?\s*([a-z]+)/i,
+  /\b(?:this is|that's|that is|here is|here's|meet|say hello to|say hi to) my (?:best )?(?:friend|brother|sister|mom|mommy|mum|mother|dad|daddy|father|grandma|grandpa|cousin|teacher)\s+([a-z]+)/i,
+  /\b(?:please meet|meet)\s+([a-z]+)/i,
+  /\b(?:say hello to|say hi to)\s+([a-z]+)/i,
+];
+
+// Could be a name, could be anything ("i'm mad", "that's enough", "this is fun").
+// Counts only when it ends the sentence, after the rules, and when the closest
+// thing the NLU knows is an introduction (true of "i'm emma", not of "i'm stuck").
+const LOOSE_NAME_PATTERNS = [
+  /\b(?:i'm|i am)\s+([a-z]+)[\s!.]*$/i,
+  /\b(?:this is|that's|that is)\s+([a-z]+)[\s!.]*$/i,
 ];
 
 const STOP_WORDS = new Set([
   // Blocky
   'blocky',
+  // People who are not names
+  'you', 'me', 'him', 'them', 'us', 'someone', 'somebody', 'everyone', 'everybody',
+  'mine', 'yours', 'mom', 'mommy', 'mum', 'dad', 'daddy', 'grandma', 'grandpa',
+  // Numbers ("i'm five")
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   // Emotions / states
   'happy', 'sad', 'scared', 'angry', 'bored', 'hungry', 'tired',
   'sleepy', 'excited', 'lonely', 'sick', 'cold', 'hot', 'thirsty',
@@ -103,8 +133,8 @@ const STOP_WORDS = new Set([
   'it', 'up', 'down', 'out', 'off', 'on', 'over', 'about',
 ]);
 
-function extractName(text) {
-  for (const pattern of NAME_PATTERNS) {
+function extractName(text, patterns = NAME_PATTERNS) {
+  for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
       const name = match[1].trim();
@@ -166,10 +196,20 @@ export async function init() {
   bus.on('ear:sentence', onSentence);
   bus.on('speech:sentence', onSentence); // fallback compatibility
 
-  // Init NLU engine in background (non-blocking)
-  nlu.init().catch(e => console.warn('[intent] NLU init failed:', e));
+  // Init NLU engine in background (non-blocking), once the ears have finished starting:
+  // on a phone the speech model and this one, loading together, each took about three
+  // times as long. The rules above answer in the meantime.
+  earsSettled().then(() => nlu.init()).catch(e => console.warn('[intent] NLU init failed:', e));
 
   console.log('[intent] Ready (rules + NLU)');
+}
+
+function earsSettled() {
+  return new Promise((resolve) => {
+    const offs = ['ear:ready', 'ear:unavailable', 'ear:denied'].map(ev => bus.on(ev, done));
+    const timer = setTimeout(done, 30000);     // whatever happens to the ears, the NLU still starts
+    function done() { clearTimeout(timer); offs.forEach(off => off()); resolve(); }
+  });
 }
 
 export function stop() {
@@ -184,30 +224,48 @@ export function stop() {
 
 function onSentence(sentence) {
   if (!sentence) return;
-  const text = sentence.toLowerCase().trim();
+  const text = sentence.toLowerCase().replace(/[\u2018\u2019]/g, "'").trim();
   if (!text) return;
 
   const now = Date.now();
   if (now - lastClassifiedTime < CLASSIFY_COOLDOWN) return;
 
-  // Entity extraction (always runs — regex is the right tool for names)
+  resolve(text)
+    .then(r => { if (r) emitIntent(r.intent, r.entities, r.confidence, r.source); })
+    .catch(e => console.error('[intent] NLU error:', e));
+}
+
+// What a sentence means: { intent, entities, confidence, source } or null.
+// Nothing is emitted here, so it can be called from a test page.
+export async function resolve(text) {
+  // A name said outright (regex is the right tool for names)
   const name = extractName(text);
-  if (name) {
-    emitIntent('introduction', { name }, 0.95, 'entity');
-    return;
-  }
+  if (name) return { intent: 'introduction', entities: { name }, confidence: 0.95, source: 'entity' };
 
   // ── Tier 1: Rules (fast keyword match) ──
   const ruleMatch = matchRules(text);
-  if (ruleMatch) {
-    emitIntent(ruleMatch, {}, 1.0, 'rules');
-    return;
-  }
+  if (ruleMatch) return { intent: ruleMatch, entities: {}, confidence: 1.0, source: 'rules' };
+  if (NAME_ALONE.test(text)) return { intent: 'attention', entities: {}, confidence: 1.0, source: 'rules' };
 
   // ── Tier 2: NLU semantic classification ──
+  let result = null, closest = null;
   if (nlu.isReady()) {
-    runNLU(text);
+    const embedding = await nlu.embed(text);
+    if (embedding) { closest = nlu.nearest(embedding); result = nlu.classify(embedding); }
+    if (result) console.log(`[intent] NLU: "${text.slice(0, 40)}" → ${result.intent} (${(result.confidence * 100).toFixed(0)}%)`);
   }
+
+  // "i'm emma" / "this is leo"
+  const looseName = extractName(text, LOOSE_NAME_PATTERNS);
+  if (looseName && closest?.intent === 'introduction') {
+    return { intent: 'introduction', entities: { name: looseName }, confidence: 0.8, source: 'entity' };
+  }
+
+  if (result) return { intent: result.intent, entities: {}, confidence: result.confidence, source: 'nlu' };
+
+  // Nothing understood, but blocky was called
+  if (NAME_SAID.test(text)) return { intent: 'attention', entities: {}, confidence: 0.8, source: 'rules' };
+  return null;
 }
 
 // ══════════════════════════════════════════
@@ -238,10 +296,11 @@ function onInterim(text) {
 
 function matchRules(text) {
   for (const rule of RULES) {
-    for (const word of rule.words) {
-      if (text.includes(word)) {
-        return rule.intent;
-      }
+    for (const pattern of rule.patterns) {
+      const match = pattern.exec(text);
+      if (!match) continue;
+      if (NEGATABLE.has(rule.intent) && NEGATION.test(text.slice(0, match.index))) continue;
+      return rule.intent;
     }
   }
   return null;
@@ -249,25 +308,6 @@ function matchRules(text) {
 
 function isIntroductionText(text) {
   return NAME_PATTERNS.some(p => p.test(text));
-}
-
-// ══════════════════════════════════════════
-// Tier 2: NLU semantic matching
-// ══════════════════════════════════════════
-
-async function runNLU(text) {
-  try {
-    const embedding = await nlu.embed(text);
-    if (!embedding) return;
-
-    const result = nlu.classify(embedding);
-    if (!result) return;
-
-    console.log(`[intent] NLU: "${text.slice(0, 40)}" → ${result.intent} (${(result.confidence * 100).toFixed(0)}%)`);
-    emitIntent(result.intent, {}, result.confidence, 'nlu');
-  } catch (e) {
-    console.error('[intent] NLU error:', e);
-  }
 }
 
 // ══════════════════════════════════════════

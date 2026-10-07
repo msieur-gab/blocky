@@ -411,6 +411,8 @@ export function startScan() { renderer.setScanning(true); }
 export function stopScan() { renderer.setScanning(false); }
 export function setRadioMode(on, autoPlay) { renderer.setRadioMode(on, autoPlay); }
 export function isRadioPlaying() { return renderer.isRadioPlaying(); }
+export function holdRadio(on) { renderer.holdRadio(on); }
+export function isRadioMode() { return renderer.isRadioMode(); }
 
 // State queries
 export function isIdleBlocked() { return overrideActive || activeChain !== null || chainPhase !== 'none'; }

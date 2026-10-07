@@ -21,8 +21,10 @@ A small creature that keeps a child company on a donated phone. One repository
   adapted from the symbios Android wrapper (see `kiosk/README.md`, "When the page can't load"
   and "Security notes"); they compile but have not been run on a phone yet.
 - The untouched originals are in `~/dev/archive_blocky/`.
-- Not in git: the sherpa-onnx `.wasm` and `.data` files under `app/assets/sherpa/`
-  (about 190 MB, ignored). A fresh clone needs them copied in before `?stt=onnx` works.
+- Speech models under `app/assets/sherpa/asr/`: the engine (`.wasm`) and a 70 MB English
+  model (`…-en-kroko.data`, Kroko community model, CC-BY-SA) are meant to be in git so the
+  deployed page can hear. The older 190 MB model (`sherpa-onnx-wasm-main-asr.data`) is over
+  GitHub's 100 MB limit and stays ignored; `?model=big` uses it where it is present.
 - The older branches (`master`, `feature/rps-game`, `v2/architecture`, `v3/face-system`,
   `v3/on-device-stt`) predate the move into `app/` and keep the flat layout.
 

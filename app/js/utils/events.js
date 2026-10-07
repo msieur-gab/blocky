@@ -16,6 +16,9 @@ export const bus = {
   },
 
   emit(event, data) {
-    listeners.get(event)?.forEach(fn => fn(data));
+    // One listener failing must not stop the others, nor whoever sent the event
+    listeners.get(event)?.forEach(fn => {
+      try { fn(data); } catch (e) { console.error(`[bus] "${event}" listener failed:`, e); }
+    });
   },
 };

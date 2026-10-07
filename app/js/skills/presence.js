@@ -4,6 +4,8 @@
 // Manages mood, agreement, emotions, idle life
 // ══════════════════════════════════════════
 
+import { themes } from '../data/talk.js';
+
 // ── Intent → chain + ambient mapping ──
 
 const INTENT_MAP = {
@@ -27,6 +29,9 @@ const INTENT_MAP = {
   stop:           { ambient: 'calm' },
 };
 
+// Small-talk themes bring their own reaction
+for (const [theme, { react }] of Object.entries(themes)) INTENT_MAP[theme] = react;
+
 // ── Personality timers ──
 
 let ctx = null;
@@ -47,6 +52,14 @@ const BORED_BEHAVIORS = ['bored', 'silly', 'embarrassed'];
 function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 function rand(min, max) { return min + Math.random() * (max - min); }
 
+// A mapping can list several chains: one at random, never the same twice in a row
+const lastChain = {};
+function pickChain(intent, chain) {
+  if (!Array.isArray(chain)) return chain;
+  const pool = chain.length > 1 ? chain.filter(c => c !== lastChain[intent]) : chain;
+  return lastChain[intent] = pick(pool);
+}
+
 function scheduleIdle() {
   if (asleep) return;
 
@@ -63,6 +76,9 @@ function scheduleIdle() {
 
   idleTimer = setTimeout(() => {
     if (asleep) return;
+
+    // The radio is on: no fidgeting, no noises over the music, no falling asleep
+    if (ctx?.face.isRadioMode?.()) { scheduleIdle(); return; }
 
     if (ctx?.state?.silenceDuration > SLEEP_THRESHOLD) {
       asleep = true;
@@ -155,7 +171,7 @@ export default {
 
     // Play chain or gesture
     if (mapping.chain) {
-      ctx.face.chain(mapping.chain);
+      ctx.face.chain(pickChain(intent, mapping.chain));
       if (intent === 'sleep') asleep = true;
     }
     else if (mapping.gesture) ctx.face.head(mapping.gesture);

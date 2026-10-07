@@ -118,6 +118,19 @@ function initReactionLog() {
     logEntry(msg);
     broadcastLog(msg, 'face');
   });
+  // Deaf is otherwise silent: say so where someone looking for the reason will see it
+  bus.on('ear:unavailable', (info) => {
+    const msg = `ears: speech recognition is not working in this browser${info?.reason ? ` (${info.reason})` : ''}`;
+    dom.transcript.textContent = msg;
+    logEntry(msg);
+    broadcastLog(msg, 'intent');
+  });
+  bus.on('ear:denied', () => {
+    const msg = 'ears: microphone not allowed';
+    dom.transcript.textContent = msg;
+    logEntry(msg);
+    broadcastLog(msg, 'intent');
+  });
   bus.on('gesture:raw', ({ raw, confidence }) => {
     broadcastLog(`raw gesture: ${raw} (${(confidence * 100).toFixed(0)}%)`, '');
   });
@@ -308,9 +321,9 @@ startGate.addEventListener('click', async () => {
 
 async function startNormalMode() {
   // Init perception
+  intent.init();       // first: it waits for the ears to say they are ready
   ears.init();
   await faces.init();
-  intent.init();
 
   // Register skills
   kernel.register(presenceSkill);
@@ -343,7 +356,21 @@ dom.themeToggle.addEventListener('click', () => {
 });
 window.addEventListener('resize', () => faceApi.resize());
 
+// Keep models, engines and libraries on the device after the first visit (see sw.js)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('[app] No service worker:', e.message));
+}
+
 faceApi.init(dom.canvas);
+
+// The look, to try from the address bar (the tuner's values):
+//   ?pixels      the pixel grid, 64 cells along the short side (?pixels=48 for another size)
+//   ?color=mint  mint eyes on near-black, as in the face lab
+{
+  const look = new URLSearchParams(window.location.search);
+  if (look.has('pixels')) faceApi.setPixelGrid(parseInt(look.get('pixels'), 10) || 64);
+  if (look.get('color') === 'mint') faceApi.setPalette({ fg: '#C6F3E5', bg: '#0B1110' });
+}
 // face-api now loads catalogs directly from js/data/
 lastT = performance.now();
 requestAnimationFrame(loop);

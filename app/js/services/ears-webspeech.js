@@ -24,6 +24,13 @@ const WAKE_LISTEN_MS = 2500;   // listen window in wake mode
 const WAKE_PAUSE_MS = 1000;    // pause between wake windows
 const ACTIVE_TIMEOUT_MS = 12000; // return to wake after silence
 
+// Restarting the recognizer
+const MAX_FAILURES = 5;        // real errors in a row before giving up
+let failures = 0;
+let lastError = null;
+let restartTimer = null;
+let heardStart = false;        // the recognizer said it began listening since the last start()
+
 // ── Init ──
 
 export async function init() {
@@ -109,6 +116,7 @@ function stopWake() {
 function startActive() {
   stage = 'active';
   transcript = '';
+  failures = 0;
 
   recognition = new SR();
   recognition.continuous = true;
@@ -118,6 +126,8 @@ function startActive() {
   recognition.onresult = (e) => {
     let finalText = '';
     let interimText = '';
+
+    failures = 0;     // it heard something: the service works
 
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const result = e.results[i];
@@ -150,30 +160,50 @@ function startActive() {
     }
   };
 
+  // The recognizer stops by itself after every phrase or silence, and is started again here.
+  // One restart path only (onend), with a growing pause when it keeps failing: restarting at once,
+  // from both onend and onerror, hammered the microphone in browsers that have no speech service
+  // (Brave), made the page stutter, and never recognized anything.
+  recognition.onstart = () => { heardStart = true; };
+
   recognition.onend = () => {
-    if (stage === 'active') {
-      try { recognition.start(); } catch (e) { /* noop */ }
+    if (stage !== 'active') return;
+    // Brave has the API but no speech service behind it: start() is followed by an end,
+    // with no start and no error in between. That is a failure too.
+    if (!heardStart) { failures++; lastError = lastError || 'no-service'; }
+    if (failures >= MAX_FAILURES) {
+      console.warn(`[ears] Speech recognition is not working here (${lastError}); giving up`);
+      stage = 'off';
+      bus.emit('ear:unavailable', { reason: lastError });
+      return;
     }
+    const pause = failures === 0 ? 250 : Math.min(8000, 500 * 2 ** failures);
+    restartTimer = setTimeout(() => {
+      if (stage !== 'active') return;
+      heardStart = false;
+      try { recognition.start(); } catch (e) { /* already started */ }
+    }, pause);
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'not-allowed') {
+    lastError = e.error;
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      stage = 'off';
       bus.emit('ear:denied');
       return;
     }
-    if (stage === 'active') {
-      setTimeout(() => {
-        try { recognition.start(); } catch (ex) { /* noop */ }
-      }, 500);
-    }
+    // Silence and a deliberate stop are normal; anything else counts against the service
+    if (e.error !== 'no-speech' && e.error !== 'aborted') failures++;
   };
 
   // Active timeout: return to wake after silence
   resetActiveTimeout();
 
   try {
+    heardStart = false;
     recognition.start();
     bus.emit('ear:listening');
+    bus.emit('ear:ready');
     console.log('[ears] Active listening started');
   } catch (e) {
     console.warn('[ears] Failed to start active listening:', e);
@@ -187,6 +217,7 @@ function resetActiveTimeout() {
 
 function stopActive() {
   if (activeTimer) { clearTimeout(activeTimer); activeTimer = null; }
+  if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
   if (recognition && stage === 'active') {
     recognition.onend = null;
     try { recognition.stop(); } catch (e) { /* noop */ }

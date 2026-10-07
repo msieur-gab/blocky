@@ -51,7 +51,9 @@ export function tokenize(text) {
   const clean = text.toLowerCase().trim();
 
   // Whitespace split → wordpiece each token
-  const words = clean.split(/\s+/).filter(w => w.length > 0);
+  // Contractions are split the way BERT does it: "let's" → let ' s
+  const words = clean.replace(/[\u2018\u2019]/g, "'").split(/\s+/)
+    .flatMap(w => w.split(/(')/)).filter(w => w.length > 0);
   const tokens = [CLS_ID];
 
   for (const word of words) {
@@ -82,6 +84,8 @@ export function tokenize(text) {
 // ── WordPiece subword tokenization ──
 
 function wordPiece(word) {
+  if (word === "'") return [vocab.get("'") ?? UNK_ID];
+
   // Strip punctuation from word edges but keep for tokenization
   const cleaned = stripPunctuation(word);
   if (cleaned.length === 0) return [UNK_ID];

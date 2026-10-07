@@ -98,7 +98,7 @@ export const S = {
   scanDir: 1,
 
   // Radio mode
-  radioMode: false, radioPlaying: false,
+  radioMode: false, radioPlaying: false, radioHeld: false,
   radioPulse: 0,          // mouth pulse animation
   radioGroove: 0,         // head sway phase
   radioAudio: null,

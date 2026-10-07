@@ -305,6 +305,47 @@ export const catalog = {
     ],
   },
 
+  // ── Small talk (data/talk.js) — a theme lists several, one is picked at random ──
+
+  // "no… NO!"
+  refuse_twice: {
+    steps: [
+      { behavior: 'calm',    dur: 900,  head: 'shake',        sound: 'hum' },
+      { behavior: 'annoyed', dur: 1300, head: 'shake_strong', sound: 'grumble' },
+    ],
+  },
+
+  // Pulls back first, then refuses
+  refuse_recoil: {
+    steps: [
+      { behavior: 'shocked', dur: 500,  head: 'recoil',       sound: 'squeak' },
+      { behavior: 'annoyed', dur: 1300, head: 'shake_strong', sound: 'grumble' },
+    ],
+  },
+
+  // Eyes the offer with suspicion, then refuses
+  refuse_suspicious: {
+    steps: [
+      { behavior: 'suspicious', dur: 800,  sound: 'hum' },
+      { behavior: 'angry',      dur: 1300, head: 'shake_strong', sound: 'grumble' },
+    ],
+  },
+
+  // Eyes light up, then a big yes
+  accept_starry: {
+    steps: [
+      { behavior: 'starry', dur: 500,  head: 'perk',       sound: 'chirp_up' },
+      { behavior: 'happy',  dur: 1100, head: 'nod_strong', sound: 'babble_excited' },
+    ],
+  },
+
+  accept_excited: {
+    steps: [
+      { behavior: 'excited', dur: 1100, head: 'nod_strong', sound: 'babble_excited' },
+      { behavior: 'happy',   dur: 300 },
+    ],
+  },
+
   // ── Touch ──
 
   // The hand has just left: it stays happy a moment longer

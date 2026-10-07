@@ -22,7 +22,7 @@ import { drawSigns } from './face/draw-signs.js';
 import { pixelCanvas, showPixels } from './face/pixel-grid.js';
 
 export { nudge, lookAt, setHabits, emit } from './face/motion.js';
-export { setRadioMode, isRadioPlaying } from './face/radio.js';
+export { setRadioMode, isRadioPlaying, isRadioMode, holdRadio } from './face/radio.js';
 export { onPet } from './face/touch.js';
 
 // ── Init ──
@@ -116,7 +116,8 @@ export function draw() {
   if (!S.ctx) return;
   const { fg, bg } = colors();
 
-  if (!S.gridCells) { paint(fg, bg); return; }
+  // (no pixel grid on a canvas with no size yet: there is no cell to compute)
+  if (!S.gridCells || !S.W || !S.H) { paint(fg, bg); return; }
 
   // Pixel grid: the face is painted straight onto a tiny canvas, one canvas pixel per cell,
   // so there is never a big picture to read back. Then each cell is made fully on or off.

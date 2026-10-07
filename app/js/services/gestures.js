@@ -31,17 +31,16 @@ const GESTURE_MAP = {
 async function ensureRecognizer() {
   if (gestureRecognizer) return true;
 
-  const { FilesetResolver, GestureRecognizer } = await import(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest'
-  );
+  // MediaPipe tasks-vision 1.1.0 and its model are kept in assets/vendor/mediapipe/
+  const VENDOR = new URL('../../assets/vendor/mediapipe/', import.meta.url).href;
 
-  const vision = await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-  );
+  const { FilesetResolver, GestureRecognizer } = await import(VENDOR + 'vision_bundle.mjs');
+
+  const vision = await FilesetResolver.forVisionTasks(VENDOR + 'wasm');
 
   gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task',
+      modelAssetPath: VENDOR + 'gesture_recognizer.task',
       delegate: 'GPU',
     },
     runningMode: 'VIDEO',
@@ -202,14 +201,21 @@ export async function init() {
   // Lazy — loads on first start()
 }
 
+// Opening the camera and loading MediaPipe take seconds on a phone. A stop() that arrives
+// meanwhile must win: without this check, start() carried on afterwards and left the camera
+// and the detection loop running for good, under whatever came next (the radio, for one).
+let wanted = 0;
+
 export async function start() {
   if (running) return;
+  const mine = ++wanted;
 
   const cam = await camera.acquire('gestures');
   if (!cam) {
     console.warn('[gestures] Camera not available');
     return;
   }
+  if (mine !== wanted) { camera.release('gestures'); return; }
 
   try {
     await ensureRecognizer();
@@ -218,6 +224,7 @@ export async function start() {
     camera.release('gestures');
     return;
   }
+  if (mine !== wanted) { camera.release('gestures'); return; }
 
   running = true;
   lastGesture = null;
@@ -228,6 +235,7 @@ export async function start() {
 }
 
 export function stop() {
+  wanted++;
   running = false;
   if (loopTimer) {
     clearTimeout(loopTimer);
