@@ -89,14 +89,16 @@ const NAME_PATTERNS = [
   /\b(?:this is|that's|that is|here is|here's|meet|say hello to|say hi to) my (?:best )?(?:friend|brother|sister|mom|mommy|mum|mother|dad|daddy|father|grandma|grandpa|cousin|teacher)\s+([a-z]+)/i,
   /\b(?:please meet|meet)\s+([a-z]+)/i,
   /\b(?:say hello to|say hi to)\s+([a-z]+)/i,
+  // "this is my mom": the person is called what the child calls them
+  /\b(?:this is|that's|that is|here is|here's|it's|meet|say hello to|say hi to) my (mom|mommy|mum|mama|dad|daddy|papa|grandma|grandpa)[\s!.]*$/i,
 ];
 
 // Could be a name, could be anything ("i'm mad", "that's enough", "this is fun").
-// Counts only when it ends the sentence, after the rules, and when the closest
-// thing the NLU knows is an introduction (true of "i'm emma", not of "i'm stuck").
+// Counts only when it ends the sentence ("…eva", "…eva my sister"), after the rules, and
+// when the word itself reads as a name to the NLU, or the whole sentence as an introduction.
 const LOOSE_NAME_PATTERNS = [
   /\b(?:i'm|i am)\s+([a-z]+)[\s!.]*$/i,
-  /\b(?:this is|that's|that is)\s+([a-z]+)[\s!.]*$/i,
+  /\b(?:this is|that's|that is|it's|here is|here's)\s+([a-z]+)(?:,? my [a-z]+)?[\s!.]*$/i,
 ];
 
 const STOP_WORDS = new Set([
@@ -104,7 +106,7 @@ const STOP_WORDS = new Set([
   'blocky',
   // People who are not names
   'you', 'me', 'him', 'them', 'us', 'someone', 'somebody', 'everyone', 'everybody',
-  'mine', 'yours', 'mom', 'mommy', 'mum', 'dad', 'daddy', 'grandma', 'grandpa',
+  'mine', 'yours',
   // Numbers ("i'm five")
   'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   // Emotions / states
@@ -255,9 +257,9 @@ export async function resolve(text) {
     if (result) console.log(`[intent] NLU: "${text.slice(0, 40)}" → ${result.intent} (${(result.confidence * 100).toFixed(0)}%)`);
   }
 
-  // "i'm emma" / "this is leo"
+  // "i'm emma" / "look this is leo" / "this is mom"
   const looseName = extractName(text, LOOSE_NAME_PATTERNS);
-  if (looseName && closest?.intent === 'introduction') {
+  if (looseName && (closest?.intent === 'introduction' || await nlu.looksLikeName(looseName))) {
     return { intent: 'introduction', entities: { name: looseName }, confidence: 0.8, source: 'entity' };
   }
 

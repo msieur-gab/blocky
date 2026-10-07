@@ -289,6 +289,27 @@ export function nearest(embedding) {
   return { intent: bestIntent, confidence: bestScore };
 }
 
+// ── Is this word a first name? ──
+// "this is eva" against "this is fun": the word is compared with a handful of names and a
+// handful of ordinary words, and belongs with the closer group. Measured on words in neither
+// list: names it has not seen are recognised about nine times in ten (workbench/nlu-eval).
+
+const NAME_LIKE = ['emma', 'tom', 'sophie', 'anna', 'lucas', 'maria', 'david', 'mom', 'dad', 'grandma', 'john', 'sara', 'leo', 'mia'];
+const WORD_LIKE = ['fun', 'good', 'bad', 'big', 'ready', 'angry', 'tired', 'done', 'nice', 'hard', 'right', 'here', 'broken', 'first', 'enough', 'mine', 'true', 'strange', 'lost', 'busy', 'old', 'dirty', 'time', 'raining', 'dark', 'cold'];
+let nameRefs = null;
+
+export async function looksLikeName(word) {
+  if (!session) return false;
+  if (!nameRefs) {
+    nameRefs = { names: [], words: [] };
+    for (const w of NAME_LIKE) nameRefs.names.push(await embed(w));
+    for (const w of WORD_LIKE) nameRefs.words.push(await embed(w));
+  }
+  const e = await embed(word.toLowerCase());
+  const closest = list => Math.max(...list.map(ref => cosine(e, ref)));
+  return closest(nameRefs.names) > closest(nameRefs.words);
+}
+
 export function classify(embedding) {
   const best = nearest(embedding);
   return best.confidence >= MATCH_THRESHOLD ? best : null;
