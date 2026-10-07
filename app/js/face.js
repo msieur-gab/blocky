@@ -551,11 +551,13 @@ export function draw() {
   if (scanAmt < 0.5) drawSigns(fg);
 
   // ── Mouth ── (hidden during scan)
-  if (face.mouth.show > 0.01 && scanAmt < 0.5) {
+  // prop.mouth 0 = a face without a mouth (the radio button still needs one)
+  const mouthSize = prop.mouth > 0.01 ? prop.mouth : (radioMode ? 1.5 : 0);
+  if (mouthSize && face.mouth.show > 0.01 && scanAmt < 0.5) {
     const mouthAlpha = face.mouth.show * (1 - scanAmt * 2);
     if (mouthAlpha > 0.01) {
       const m = face.mouth;
-      const big = prop.mouth;
+      const big = mouthSize;
 
       // The mouth belongs to the face: it sits under the eyes whatever their height,
       // and goes most of the way with them when they look somewhere
@@ -825,12 +827,19 @@ function drawSigns(fg) {
   ctx.globalAlpha = signsAmt;
 
   if (signs.includes('blush')) {
-    // two soft cheeks, just outside and below the eyes
+    // three slanted strokes on each cheek, just outside and below the eyes
+    ctx.save();
+    ctx.lineWidth = line(7 * u);
     for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(side * (outer + 26) * u, eyeH * 0.44 * u, 30 * u, 13 * u, 0, 0, Math.PI * 2);
-      ctx.fill();
+      for (let i = -1; i <= 1; i++) {
+        const x = side * (outer + 34) + i * 20, y = eyeH * 0.42;
+        ctx.beginPath();
+        ctx.moveTo((x - 7) * u, (y + 15) * u);
+        ctx.lineTo((x + 7) * u, (y - 15) * u);
+        ctx.stroke();
+      }
     }
+    ctx.restore();
   }
   if (signs.includes('question')) {
     const size = eyeH * 0.5;

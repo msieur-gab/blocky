@@ -79,6 +79,9 @@ pre { margin: 0; overflow-x: auto; background: var(--bg); border: 1px solid var(
         <div class="seg" role="group" aria-label="Colour">
           <button data-color="mint">Mint</button><button data-color="cream">Cream</button>
         </div>
+        <div class="seg" role="group" aria-label="Mouth">
+          <button data-mouth="1">Mouth</button><button data-mouth="0">No mouth</button>
+        </div>
         <div class="seg" role="group" aria-label="Digits">
           <button data-digits="type">Digits: bold type</button><button data-digits="drawn">Drawn</button>
         </div>
@@ -146,7 +149,7 @@ const SLIDERS = [
 const KEY = 'blocky-face-tuner-5';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
-const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', tune: { ...PRESETS.blocky }, ...load() };
+const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', mouth: true, tune: { ...PRESETS.blocky }, ...load() };
 state.tune = { ...TUNE_DEFAULT, ...state.tune };
 
 const $ = id => document.getElementById(id);
@@ -178,11 +181,12 @@ function apply() {
   api.setPalette(COLORS[state.color]);
   api.setPixelGrid(state.pixel ? GRID : 0);
   setDigitStyle(state.digits);
-  api.setProportions(state.tune);
+  api.setProportions({ ...state.tune, mouth: state.mouth ? state.tune.mouth : 0 });
   document.querySelectorAll('[data-orient]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.orient === state.orient)));
   document.querySelectorAll('[data-pixel]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.pixel === '1') === state.pixel)));
   document.querySelectorAll('[data-color]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === state.color)));
   document.querySelectorAll('[data-digits]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.digits === state.digits)));
+  document.querySelectorAll('[data-mouth]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.mouth === '1') === state.mouth)));
   for (const [k] of SLIDERS) { $('p-' + k).value = state.tune[k]; $('o-' + k).textContent = state.tune[k]; }
   layoutPhone();
   $('export').textContent = exportText();
@@ -191,7 +195,7 @@ function apply() {
 function exportText() {
   const t = state.tune, c = COLORS[state.color];
   return `// face tuner — ${state.orient}, ${state.pixel ? 'pixel grid' : 'smooth'}, ${state.color}, digits ${state.digits}\n` +
-    `faceApi.setProportions({ eyeW: ${t.eyeW}, eyeH: ${t.eyeH}, gap: ${t.gap}, zoom: ${t.zoom}, symbol: ${t.symbol}, stroke: ${t.stroke}, mouth: ${t.mouth} });\n` +
+    `faceApi.setProportions({ eyeW: ${t.eyeW}, eyeH: ${t.eyeH}, gap: ${t.gap}, zoom: ${t.zoom}, symbol: ${t.symbol}, stroke: ${t.stroke}, mouth: ${state.mouth ? t.mouth : 0} });\n` +
     `faceApi.setPalette({ fg: '${c.fg}', bg: '${c.bg}' });\n` +
     `faceApi.setPixelGrid(${state.pixel ? GRID : 0});`;
 }
@@ -207,6 +211,7 @@ document.querySelectorAll('[data-pixel]').forEach(b => b.addEventListener('click
 document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => { state.color = b.dataset.color; apply(); }));
 document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { state.tune = { ...PRESETS[b.dataset.preset] }; apply(); }));
 document.querySelectorAll('[data-digits]').forEach(b => b.addEventListener('click', () => { state.digits = b.dataset.digits; apply(); }));
+document.querySelectorAll('[data-mouth]').forEach(b => b.addEventListener('click', () => { state.mouth = b.dataset.mouth === '1'; apply(); }));
 
 $('btnSound').addEventListener('click', e => {
   const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
