@@ -724,9 +724,11 @@ function closeLids(eye, side, ew, eh, shift) {
   if (top < 0.005 && bot < 0.005 && Math.abs(slant) < 0.5) return;
 
   const X = ew * 1.5 + shift;                              // well past the eye on both sides
-  const yTop = -eh + 2 * eh * top;
+  // With no upper lid at all, its edge stays clear above the eye instead of grazing the top
+  const lidInUse = clamp(top * 8 + Math.abs(slant) / 6, 0, 1);
+  const yTop = -eh + 2 * eh * top - (1 - lidInUse) * eh * 0.5;
   const lean = Math.tan(slant * Math.PI / 180) * X * -side;  // the nose is at +x for the left eye
-  const sag = eh * 0.1;
+  const sag = eh * 0.1 * lidInUse;
 
   const yMid = eh - 2 * eh * bot;                          // top of the arch
   const yEnd = eh - 2 * eh * bot * 0.25;                   // where it meets the sides

@@ -46,7 +46,7 @@ export const catalog = {
   curious_l:    { ...DEFAULT, h: 210, tilt: -5 },
   curious_r:    { ...DEFAULT, h: 168, tilt: 8, lidTop: 0.12 },
   annoyed:      { ...DEFAULT, h: 155, lidTop: 0.45, slant: 10 },
-  wink_closed:  { ...DEFAULT, h: 110, lidBot: 0.62 },             // a thick arch at eye level
+  wink_closed:  { ...DEFAULT, h: 130, lidBot: 0.5 },              // a thick arch at eye level
   sleepy:       { ...DEFAULT, h: 180, lidTop: 0.48 },             // half shut; `droop` does the rest
   petted:       { ...DEFAULT, h: 150, lidBot: 0.6 },              // two happy arches
   yawn:         { ...DEFAULT, h: 130, lidTop: 0.2, lidBot: 0.25 },
