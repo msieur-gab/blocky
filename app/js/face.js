@@ -43,6 +43,30 @@ let breathPhase = 0;
 // Micro-drift — eyes never perfectly still
 let driftPhase = Math.random() * 100;
 
+// Jelly — a damped spring that squashes/stretches the eyes on every change of mood.
+// jelly > 0 = squashed (wider, shorter), < 0 = stretched (taller, thinner).
+let jelly = 0;
+let jellyV = 0;
+const JELLY_K = 220;   // stiffness  (~2.4 Hz wobble)
+const JELLY_C = 9;     // damping    (settles in ~0.5 s, one visible rebound)
+
+// Shape morph — symbols, digits, game pieces don't snap: the eyes close and reopen as the new shape.
+let morphAmt = 0;      // 0 = open, 1 = shut
+let morphPhase = 0;    // 0 idle · 1 closing · 2 opening
+
+// Life — what the current behavior does on its own (see behaviors.js `life`)
+//   gaze: 'still' | 'up' | 'down' | 'away' | 'shifty'   (default: wander)
+//   show: ['blush' | 'question' | 'dots' | 'stars']     drawn while the behavior lasts
+//   emit: { deco: 'heart' | 'huff' | 'sweat' | 'tear' | 'z', every: [minMs, maxMs] }
+//   blink: false                                        wide-eyed stare
+let life = null;
+let lifeAmt = 0;       // fades `show` decorations in and out
+let clock = 0;
+let nextEmit = Infinity;
+let lookingAway = false;
+let shiftSide = 1;
+const particles = [];
+
 // Gaze — autonomous look direction, independent from expression
 let gazeX = 0;         // current gaze offset (-1 to 1)
 let gazeY = 0;
@@ -101,6 +125,34 @@ function onCanvasTap(e) {
 }
 
 export function setTheme(dark) { darkTheme = dark; }
+
+// Give the eyes a jolt. Positive squashes, negative stretches (surprise).
+export function kick(impulse = 1.4) { jellyV += impulse; }
+
+const randMs = ([a, b]) => (a + Math.random() * (b - a)) / 1000;
+
+export function setLife(l) {
+  life = l || null;
+  lifeAmt = 0;
+  gazeTimer = 0;
+  lookingAway = false;
+  nextEmit = life?.emit ? clock + randMs(life.emit.every) : Infinity;
+}
+
+// One-shot decoration: a Z, a heart, a huff… (also used by loop / chain frames with `deco`)
+export function spawn(type) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const p = { type, side, age: 0, seed: Math.random() * 10 };
+  switch (type) {
+    case 'z':     p.dur = 2.6; break;
+    case 'heart': p.dur = 2.0; p.x0 = side * (120 + Math.random() * 140); break;
+    case 'huff':  p.dur = 1.0; p.side = gazeX < 0 ? 1 : -1; kick(1.0); break;
+    case 'sweat': p.dur = 1.4; p.side = gazeX > 0 ? -1 : 1; break;
+    case 'tear':  p.dur = 1.2; break;
+    default: return;
+  }
+  particles.push(p);
+}
 export function setAudioRms(rms) { audioRms = rms; }
 export function setScanning(on) { scanning = on; }
 
@@ -154,9 +206,10 @@ function easedLerp(current, target, speed, dt) {
   return lerp(current, target, easedFactor(speed, dt));
 }
 
-function lerpObj(current, target, speed, dt) {
+function lerpObj(current, target, speed, dt, skip) {
   const f = easedFactor(speed, dt);
   for (const k of Object.keys(target)) {
+    if (skip && skip.includes(k)) continue;
     if (typeof target[k] === 'number' && typeof current[k] === 'number') {
       current[k] = lerp(current[k], target[k], f);
     } else {
@@ -172,13 +225,40 @@ export function update(dt, target) {
   // Eyes/mouth: smooth (6). Face transforms: snappy (12) so nods/shakes land.
   // Support both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
   face.eyeGap = easedLerp(face.eyeGap, target.gap ?? target.eyeGap ?? NEUTRAL.eyeGap, 6, dt);
-  lerpObj(face.leftEye, target.left ?? target.leftEye, 6, dt);
-  lerpObj(face.rightEye, target.right ?? target.rightEye, 6, dt);
+  const tL = target.left ?? target.leftEye;
+  const tR = target.right ?? target.rightEye;
+  lerpObj(face.leftEye, tL, 6, dt, ['shape']);
+  lerpObj(face.rightEye, tR, 6, dt, ['shape']);
   lerpObj(face.mouth, target.mouth, 6, dt);
   lerpObj(face.face, target.face, 12, dt);
 
-  // Blink — single (70%) or double (30%), disabled during scan
-  if (scanAmt < 0.5) {
+  // Shape morph: close, swap the shape while shut, reopen with a little stretch
+  const wantL = tL.shape ?? null, wantR = tR.shape ?? null;
+  const shapeDiffers = wantL !== (face.leftEye.shape ?? null) || wantR !== (face.rightEye.shape ?? null);
+  if (shapeDiffers && morphPhase !== 1) morphPhase = 1;
+  if (morphPhase === 1) {
+    morphAmt = Math.min(1, morphAmt + dt * 14);          // ~70 ms to shut
+    if (morphAmt >= 1) {
+      face.leftEye.shape = wantL;
+      face.rightEye.shape = wantR;
+      morphPhase = 2;
+      kick(-1.6);
+    }
+  } else if (morphPhase === 2) {
+    morphAmt = Math.max(0, morphAmt - dt * 9);           // ~110 ms to reopen
+    if (morphAmt <= 0) morphPhase = 0;
+  }
+
+  // Jelly spring (sub-stepped so it behaves the same at any frame rate)
+  for (let t = dt; t > 0; t -= 1 / 120) {
+    const h = Math.min(t, 1 / 120);
+    jellyV += (-JELLY_K * jelly - JELLY_C * jellyV) * h;
+    jelly += jellyV * h;
+  }
+  jelly = clamp(jelly, -0.35, 0.35);
+
+  // Blink — single (70%) or double (30%), disabled during scan and while morphing
+  if (scanAmt < 0.5 && morphPhase === 0 && life?.blink !== false) {
     blinkTimer -= dt;
 
     if (blinkPhase === 0) {
@@ -216,16 +296,52 @@ export function update(dt, target) {
   breathPhase += dt * 1.2;
   driftPhase += dt;
 
-  // Gaze wandering — pick a new target every 2-5s
+  // Gaze — wanders by default; the behavior's life can give it intent
+  clock += dt;
   gazeTimer -= dt;
-  if (gazeTimer <= 0) {
+  let gazeSpeed = 1.5;
+  const mode = life?.gaze;
+  if (mode === 'still') {
+    gazeTargetX = 0; gazeTargetY = 0; gazeSpeed = 4;
+  } else if (mode === 'up') {
+    gazeTargetX = 0.7; gazeTargetY = -0.9; gazeSpeed = 2;
+  } else if (mode === 'down') {
+    if (gazeTimer <= 0) {
+      gazeTargetX = (Math.random() - 0.5) * 0.6; gazeTargetY = 0.8;
+      gazeTimer = 2 + Math.random() * 3;
+    }
+  } else if (mode === 'away') {
+    // sulky: looks away, steals a short glance back now and then
+    if (gazeTimer <= 0) {
+      lookingAway = !lookingAway;
+      gazeTimer = lookingAway ? 2.5 + Math.random() * 2.5 : 0.7;
+    }
+    gazeTargetX = lookingAway ? -1.3 : 0; gazeTargetY = lookingAway ? 0.4 : 0; gazeSpeed = 3;
+  } else if (mode === 'shifty') {
+    // darts left and right, sometimes straight at you
+    if (gazeTimer <= 0) {
+      shiftSide = -shiftSide;
+      gazeTargetX = Math.random() < 0.25 ? 0 : shiftSide * 1.3; gazeTargetY = 0.1;
+      gazeTimer = 0.5 + Math.random() * 0.8;
+    }
+    gazeSpeed = 6;
+  } else if (gazeTimer <= 0) {
     gazeTargetX = (Math.random() - 0.5) * 1.4;
     gazeTargetY = (Math.random() - 0.5) * 0.8;
     gazeTimer = 2 + Math.random() * 3;
   }
   // Ease toward gaze target (slow, organic)
-  gazeX = easedLerp(gazeX, gazeTargetX, 1.5, dt);
-  gazeY = easedLerp(gazeY, gazeTargetY, 1.5, dt);
+  gazeX = easedLerp(gazeX, gazeTargetX, gazeSpeed, dt);
+  gazeY = easedLerp(gazeY, gazeTargetY, gazeSpeed, dt);
+
+  // Life: fade `show` decorations in, emit particles, age them
+  lifeAmt = Math.min(1, lifeAmt + dt * 3);
+  if (life?.emit && clock >= nextEmit) {
+    spawn(life.emit.deco);
+    nextEmit = clock + randMs(life.emit.every);
+  }
+  for (const p of particles) p.age += dt / p.dur;
+  for (let i = particles.length - 1; i >= 0; i--) if (particles[i].age >= 1) particles.splice(i, 1);
 
   // Radio groove — head sway + mouth pulse
   if (radioPlaying) {
@@ -290,6 +406,9 @@ export function draw() {
     drawNormalEyes(fg, gap, skX, skY);
     if (scanAmt > 0.01) ctx.globalAlpha = 1;
   }
+
+  // ── Decorations ── (hidden during scan)
+  if (scanAmt < 0.5) drawDecorations(fg);
 
   // ── Mouth ── (hidden during scan)
   if (face.mouth.show > 0.01 && scanAmt < 0.5) {
@@ -364,18 +483,37 @@ function eyePosition(side, eye, skX, skY) {
   };
 }
 
+// Eyes are drawn on their own layer so lids and brows can be erased out of them cleanly
+let layer = null, layerCtx = null;
+
+function eyeLayer(main) {
+  if (!layer) { layer = document.createElement('canvas'); layerCtx = layer.getContext('2d'); }
+  if (layer.width !== canvas.width || layer.height !== canvas.height) {
+    layer.width = canvas.width; layer.height = canvas.height;
+  }
+  layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+  layerCtx.clearRect(0, 0, layer.width, layer.height);
+  layerCtx.setTransform(main.getTransform());
+  layerCtx.globalAlpha = 1;
+  return layerCtx;
+}
+
 function drawNormalEyes(fg, gap, skX, skY) {
+  const main = ctx;
+  ctx = eyeLayer(main);
   [
     { side: -1, eye: face.leftEye },
     { side:  1, eye: face.rightEye },
   ].forEach(({ side, eye }) => {
     const perspScale = 1 + skX * side * 0.4;
-    const ew = eye.w * scale / 2 * perspScale;
-    let eh = eye.h * scale / 2 * perspScale;
+    const ew = eye.w * scale / 2 * perspScale * (1 + jelly * 0.7);
+    let eh = eye.h * scale / 2 * perspScale * (1 - jelly);
+    const ehOpen = eh;
 
-    // Blink squashes height — but skip if eyes already nearly closed (sleeping)
+    // Blink (or a shape morph) squashes height — but skip if eyes already nearly closed (sleeping)
     const eyeAlreadyClosed = eh < 8 * scale;
-    const blinkScale = eyeAlreadyClosed ? 1 : (1 - blinkAmt * 0.92);
+    const shut = Math.max(blinkAmt * 0.92, morphAmt * 0.95);
+    const blinkScale = eyeAlreadyClosed ? 1 : (1 - shut);
     eh = Math.max(1.5 * scale, eh * blinkScale);
 
     const pos = eyePosition(side, eye, skX, skY);
@@ -423,11 +561,61 @@ function drawNormalEyes(fg, gap, skX, skY) {
       ctx.arcTo(-ew + sb,  eh, -ew + st, -eh, cbl);
       ctx.arcTo(-ew + st, -eh,  ew + st, -eh, ctl);
       ctx.closePath();
+
       ctx.fill();
+      if (eye.brow || eye.lower || eye.upper) {
+        carveEye(eye, side, ew, eh, scale * perspScale * (eh / ehOpen));
+      }
     }
 
     ctx.restore();
   });
+
+  ctx = main;
+  main.save();
+  main.setTransform(1, 0, 0, 1, 0, 0);
+  main.drawImage(layer, 0, 0);   // keeps main's globalAlpha (scan fade)
+  main.restore();
+}
+
+// ── Carving ──
+// Round bites taken out of the pill, in Figma units (same space as w/h):
+//   brow  — a big circle biting the top, deeper on one side.
+//           + = inner corners cut (sulky, cross)   − = outer corners cut (sad, worried)
+//   lower — a disc rising from below: the happy crescent
+//   upper — a heavy lid with a softly curved edge (sleepy, bored, sulky)
+// Everything is round on purpose: no blades, so even "angry" stays friendly.
+
+function carveEye(eye, side, ew, eh, k) {
+  const fullW = ew * 2;
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+
+  const brow = eye.brow || 0;
+  if (Math.abs(brow) > 0.5) {
+    const inner = -side;                       // toward the nose
+    const dir = brow > 0 ? inner : -inner;
+    const R = fullW * 1.1;
+    ctx.beginPath();
+    ctx.arc(dir * (ew + R * 0.15), -eh - R + Math.abs(brow) * k, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if ((eye.lower || 0) > 0.5) {
+    const R = fullW;
+    ctx.beginPath();
+    ctx.arc(0, eh + R - eye.lower * k, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if ((eye.upper || 0) > 0.5) {
+    const R = fullW * 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -eh + eye.upper * k - R, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 // ── Scan eye drawing ──
@@ -475,5 +663,107 @@ function drawScanEyes(fg, gap, skX, skY) {
   ctx.fillRect(-span * 1.1, lineY - trailH, span * 2.2, trailH * 2);
 
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ── Decorations ──
+// Small signs around the eyes, in Figma units from the face centre (×scale).
+// `show` ones last as long as the behavior; particles come from `emit` or a frame's `deco`.
+
+function drop(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.moveTo(x - r * 0.9, y - r * 0.4);
+  ctx.lineTo(x, y - r * 2.4);
+  ctx.lineTo(x + r * 0.9, y - r * 0.4);
+  ctx.fill();
+}
+
+function heartAt(x, y, s) {
+  ctx.beginPath();
+  ctx.arc(x - s * 0.5, y, s * 0.6, 0, Math.PI * 2);
+  ctx.arc(x + s * 0.5, y, s * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - s * 1.1, y + s * 0.2);
+  ctx.lineTo(x + s * 1.1, y + s * 0.2);
+  ctx.lineTo(x, y + s * 1.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawDecorations(fg) {
+  const u = scale;
+  const half = face.eyeGap / 2;                     // eye centre, Figma units
+  const eyeW = face.leftEye.w, eyeH = face.leftEye.h;
+  const fade = (a) => Math.min(1, a * 5, (1 - a) * 4);
+
+  ctx.save();
+  ctx.fillStyle = fg;
+  ctx.strokeStyle = fg;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3 * u;
+
+  const show = life?.show || [];
+  ctx.globalAlpha = lifeAmt;
+
+  if (show.includes('blush')) {
+    for (const side of [-1, 1]) {
+      const bx = side * (half + eyeW * 0.5 + 18), by = eyeH * 0.42;
+      for (let i = 0; i < 3; i++) {
+        const x = bx + (i - 1) * 12;
+        ctx.beginPath(); ctx.moveTo((x - 4) * u, (by + 8) * u); ctx.lineTo((x + 4) * u, (by - 8) * u); ctx.stroke();
+      }
+    }
+  }
+  if (show.includes('question')) {
+    ctx.font = `600 ${70 * u}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', (half + eyeW * 0.5 + 90) * u, (-eyeH * 0.55 + Math.sin(clock * 4) * 6) * u);
+  }
+  if (show.includes('dots')) {
+    const n = Math.floor(clock * 2.2) % 4;
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.arc((half + 40 + i * 32) * u, (-eyeH * 0.5 - 50) * u, 7 * u, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (show.includes('stars')) {
+    for (let i = 0; i < 3; i++) {
+      const a = clock * 3.5 + i * Math.PI * 2 / 3;
+      if (Math.sin(a) < -0.6) continue;              // behind the head
+      const x = Math.cos(a) * (half + 90), y = -eyeH * 0.5 - 60 + Math.sin(a) * 25;
+      ctx.beginPath();
+      ctx.moveTo((x - 10) * u, y * u); ctx.lineTo((x + 10) * u, y * u);
+      ctx.moveTo(x * u, (y - 10) * u); ctx.lineTo(x * u, (y + 10) * u);
+      ctx.stroke();
+    }
+  }
+
+  for (const p of particles) {
+    const a = p.age;
+    ctx.globalAlpha = fade(a);
+    if (p.type === 'z') {
+      const size = 30 + a * 30;
+      ctx.font = `700 ${size * u}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Z', (half + 60 + a * 70) * u, (-eyeH * 0.4 - a * 150) * u);
+    } else if (p.type === 'heart') {
+      const x = p.x0 + Math.sin(a * 9 + p.seed) * 12, y = -eyeH * 0.5 - 20 - a * 140;
+      heartAt(x * u, y * u, (12 + a * 6) * u);
+    } else if (p.type === 'huff') {
+      const x = p.side * (half + eyeW * 0.5 + 40 + a * 70), y = eyeH * 0.25 - a * 20;
+      const r = 12 + a * 10;
+      for (const [dx, dy, k] of [[0, 0, 1], [p.side * 18, -10, 0.8], [p.side * 32, 4, 0.6]]) {
+        ctx.beginPath(); ctx.arc((x + dx) * u, (y + dy) * u, r * k * u, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (p.type === 'sweat') {
+      const x = p.side * (half + eyeW * 0.5 + 30), y = -eyeH * 0.3 + a * 50;
+      drop(x * u, y * u, 9 * u);
+    } else if (p.type === 'tear') {
+      const x = half * (p.side) + p.side * eyeW * 0.25, y = eyeH * 0.5 + 10 + a * a * 160;
+      drop(x * u, y * u, 8 * u);
+    }
+  }
+
   ctx.restore();
 }

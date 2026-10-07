@@ -110,6 +110,12 @@ function enterBehavior(name, stepOverrides) {
   const b = BEHAVIORS[name];
   if (!b) { console.warn(`[face-api] Unknown behavior: ${name}`); return; }
 
+  // A change of mood jolts the eyes: + squash, − stretch (behaviors may set `pop`)
+  if (name !== currentBehaviorName) {
+    renderer.kick(b.pop ?? 1.4);
+    renderer.setLife(b.life);
+  }
+
   currentBehavior = b;
   currentBehaviorName = name;
 
@@ -120,6 +126,7 @@ function enterBehavior(name, stepOverrides) {
 
   // Step overrides from chain (sound, face)
   if (stepOverrides?.face) setFace({ ...b.face, ...stepOverrides.face });
+  if (stepOverrides?.deco) renderer.spawn(stepOverrides.deco);
   const sound = stepOverrides?.sound || b.sound;
   if (sound) playSound(sound);
 
@@ -140,6 +147,7 @@ function applyLoopFrame(frame) {
   if (frame.mouth) setMouth(frame.mouth);
   if (frame.face) setFace(frame.face);
   if (frame.sound) playSound(frame.sound);
+  if (frame.deco) renderer.spawn(frame.deco);
 }
 
 function updateBehavior(dt) {
