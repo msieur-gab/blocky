@@ -10,6 +10,7 @@
 //   sound: string          — sound to play on enter (optional)
 //   loop: array            — internal micro-animation frames (optional)
 //   gap: number            — eye gap override (optional)
+//   pop: number            — jelly jolt on enter: + squash, − stretch (default 1.4)
 // ══════════════════════════════════════════
 
 export const catalog = {
@@ -28,6 +29,7 @@ export const catalog = {
   },
 
   happy: {
+    pop: 1.6,
     eyes: 'happy',
     mouth: 'smile',
     face: { scale: 1.02 },
@@ -40,6 +42,7 @@ export const catalog = {
   },
 
   scared: {
+    pop: -1.8,
     eyes: 'scared',
     mouth: 'open_small',
     face: { scale: 0.90, y: -4 },
@@ -47,6 +50,7 @@ export const catalog = {
   },
 
   excited: {
+    pop: -1.2,
     eyes: 'excited',
     mouth: 'smile',
     face: { scale: 1.08 },
@@ -54,11 +58,13 @@ export const catalog = {
   },
 
   bored: {
+    pop: 0.8,
     eyes: 'bored',
     face: { y: 10, scale: 0.96 },
   },
 
   angry: {
+    pop: 2.0,
     eyes: { left: 'angry', right: 'angry' },
     mouth: 'line_down',
     face: { scale: 1.04 },
@@ -66,6 +72,7 @@ export const catalog = {
   },
 
   surprise: {
+    pop: -2.2,
     eyes: 'surprise',
     mouth: 'open_medium',
     face: { scale: 1.10, y: -4 },
@@ -118,6 +125,7 @@ export const catalog = {
   },
 
   shocked: {
+    pop: -2.6,
     eyes: 'shocked',
     mouth: 'open_big',
     face: { scale: 1.12, y: -6 },
@@ -150,6 +158,7 @@ export const catalog = {
   },
 
   sleepy: {
+    pop: 0.6,
     eyes: 'sleepy',
     face: { y: 8, scale: 0.95 },
   },
@@ -163,6 +172,7 @@ export const catalog = {
   // ── Sleep (workbench-designed) ──
 
   drowsy: {
+    pop: 0.4,
     eyes: 'drowsy',
     sound: 'yawn',
     face: { y: 5, scale: 0.97 },
@@ -177,11 +187,13 @@ export const catalog = {
   },
 
   asleep: {
+    pop: 0.3,
     eyes: 'asleep',
     face: { y: 8, scale: 0.95 },
   },
 
   sleeping: {
+    pop: 0,
     eyes: 'exhale',
     mouth: 'sleep_exhale',
     face: { y: 8, scale: 0.95 },
