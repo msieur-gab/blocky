@@ -194,7 +194,18 @@ export const catalog = {
     face: { tilt: -3 },
   },
 
-  // ── Sleep (workbench-designed) ──
+  // ── Being stroked ──
+
+  petted: {
+    jolt: 0.08,
+    habits: { gaze: 'hold', blink: false, signs: ['blush'], emit: { sign: 'heart', every: [700, 1300] } },
+    eyes: 'petted',
+    mouth: 'smile',
+    face: { scale: 1.03, y: 4 },
+    sound: 'hum_happy',
+  },
+
+  // ── Sleep ──
 
   drowsy: {
     jolt: 0.03,

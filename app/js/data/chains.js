@@ -305,6 +305,16 @@ export const catalog = {
     ],
   },
 
+  // ── Touch ──
+
+  // The hand has just left: it stays happy a moment longer
+  petted_end: {
+    steps: [
+      { behavior: 'petted', dur: 900 },
+      { behavior: 'happy',  dur: 1200, sound: 'giggle' },
+    ],
+  },
+
   // ── Curiosity loops ──
 
   curious_loop: {

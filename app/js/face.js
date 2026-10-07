@@ -41,7 +41,7 @@ let grid = null;          // { small, smallCtx, lines } working canvases for the
 // These say what those three numbers are drawn as, so the whole face can be re-proportioned at once.
 // Values chosen by Gab in workbench/face-tuner.html, 2026-10-07.
 
-const PROPORTIONS = { eyeW: 140, eyeH: 250, gap: 460, zoom: 1.4, symbol: 1, stroke: 1 };
+const PROPORTIONS = { eyeW: 140, eyeH: 250, gap: 460, zoom: 1.4, symbol: 1, stroke: 1, mouth: 1.5 };
 const prop = { ...PROPORTIONS };
 const wide = () => prop.eyeW / 100;
 const tall = () => prop.eyeH / 200;
@@ -95,7 +95,7 @@ let lookUntil = 0;        // a tap holds the gaze on one point until this time
 let habits = {};
 let signsAmt = 0;
 let nextEmit = Infinity;
-let droop = 0;            // tired lids sinking, 0…1 of the eye
+let droop = 0;            // tired lids sinking: 0 as designed … 1 nearly shut
 let spin = 0;             // symbol rotation, radians
 let wobble = 0;           // whole-face shake, fades out
 const floaters = [];      // hearts, tears, Zs… on their way
@@ -115,6 +115,12 @@ let radioAudio = null;
 // Mon petit France Inter — "c'est pas pour les grands !"
 const RADIO_URL = 'https://icecast.radiofrance.fr/monpetitfranceinter-midfi.aac';
 
+// Touch — a tap makes it look, a rub is a stroke
+let stroke = null;        // { x, y, dist } while a finger is down
+let petting = false;
+let petHandler = null;
+let tapQuietUntil = 0;
+
 // External
 let audioRms = 0;
 
@@ -127,9 +133,57 @@ export function init(canvasEl) {
 
   canvas.addEventListener('click', onCanvasTap);
   canvas.addEventListener('touchend', onCanvasTap);
+
+  canvas.style.touchAction = 'none';     // a finger rubbing the face must not scroll the page
+  canvas.addEventListener('pointerdown', onStrokeStart);
+  canvas.addEventListener('pointermove', onStrokeMove);
+  canvas.addEventListener('pointerup', onStrokeEnd);
+  canvas.addEventListener('pointercancel', onStrokeEnd);
+}
+
+// Called with true when a stroke begins and false when the hand leaves
+export function onPet(fn) { petHandler = fn; }
+
+function pointerAt(e) {
+  const rect = canvas.getBoundingClientRect();
+  const k = W / rect.width;
+  return { x: (e.clientX - rect.left) * k, y: (e.clientY - rect.top) * k };
+}
+
+function onStrokeStart(e) {
+  stroke = { ...pointerAt(e), dist: 0 };
+}
+
+function onStrokeMove(e) {
+  if (!stroke) return;
+  const p = pointerAt(e);
+  stroke.dist += Math.hypot(p.x - stroke.x, p.y - stroke.y);
+  stroke.x = p.x; stroke.y = p.y;
+
+  // Rubbed about half the screen's short side: that is a stroke, not a tap
+  if (!petting && stroke.dist > Math.min(W, H) * 0.5) {
+    petting = true;
+    petHandler?.(true);
+  }
+  if (petting) {
+    // the eyes lean toward the hand
+    aim.x = clamp((p.x - cx) / (W / 2), -1, 1) * 0.6;
+    aim.y = clamp((p.y - cy) / (H / 2), -1, 1) * 0.6;
+    lookUntil = time + 0.6;
+  }
+}
+
+function onStrokeEnd() {
+  if (petting) {
+    petting = false;
+    tapQuietUntil = performance.now() + 400;   // the lift of the hand is not a tap
+    petHandler?.(false);
+  }
+  stroke = null;
 }
 
 function onCanvasTap(e) {
+  if (performance.now() < tapQuietUntil) return;
   const rect = canvas.getBoundingClientRect();
   const k = W / rect.width;     // the canvas may be shown scaled
   const x = ((e.clientX ?? e.changedTouches?.[0]?.clientX ?? 0) - rect.left) * k;
@@ -138,7 +192,7 @@ function onCanvasTap(e) {
   if (radioMode) {
     e.preventDefault();
     // Mouth zone: center-x ± 40px, center-y + mouth offset ± 40px
-    const mouthY = cy + (face.mouth.y || 35) * scale;
+    const mouthY = cy + (face.mouth.y || 35) * tall() * scale;
     const hitRadius = 40 * scale;
     if (Math.abs(x - cx) < hitRadius && Math.abs(y - mouthY) < hitRadius) toggleRadio();
     return;
@@ -430,8 +484,8 @@ function updateHabits(dt) {
 
   // Tired: the lids sink slowly, then it catches itself and they fly open
   if (habits.droop) {
-    droop += dt * 0.13;
-    if (droop > 0.45) { droop = 0; nudge(-0.14); }
+    droop += dt * 0.26;
+    if (droop > 1) { droop = 0; nudge(-0.14); }
   } else {
     droop = Math.max(0, droop - dt * 2);
   }
@@ -501,25 +555,30 @@ export function draw() {
     const mouthAlpha = face.mouth.show * (1 - scanAmt * 2);
     if (mouthAlpha > 0.01) {
       const m = face.mouth;
-      const my = m.y * scale;
+      const big = prop.mouth;
+
+      // The mouth belongs to the face: it sits under the eyes whatever their height,
+      // and goes most of the way with them when they look somewhere
+      const my = m.y * tall() * scale + (eyeL.y + eyeR.y) / 2 * GAZE_Y * tall() * 0.7 * scale;
+      const mx = (eyeL.x + eyeR.x) / 2 * GAZE_X * wide() * 0.7 * scale;
 
       // Radio mode: mouth pulses gently when playing
       const pulse = radioPlaying ? 1 + Math.sin(radioPulse) * 0.15 : 1;
-      const mw = m.w * scale / 2 * pulse;
-      const mh = m.h * scale / 2 * pulse;
+      const mw = m.w * big * scale / 2 * pulse * (1 + bounce.x * 0.4);
+      const mh = m.h * big * scale / 2 * pulse;
 
       ctx.save();
-      ctx.translate(skX * -6 * scale, my + skY * -3 * scale);
+      ctx.translate(mx + skX * -6 * scale, my + skY * -3 * scale);
       ctx.globalAlpha = mouthAlpha;
       ctx.fillStyle = fg;
       ctx.strokeStyle = fg;
-      ctx.lineWidth = line(2.5 * scale);
+      ctx.lineWidth = line(2.5 * big * scale);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
       const drawFn = mouthShapes[m.shape] || mouthShapes.none;
       drawFn(ctx, mw, mh, {
-        curve: (m.curve || 0) * scale,
+        curve: (m.curve || 0) * big * scale,
         open: m.open || 0,
         round: (m.round || 2) * scale / 2,
       });
@@ -656,7 +715,8 @@ function drawNormalEyes(fg, bg, skX, skY) {
 // The upper edge sags a little in the middle, so no lid ever looks like a blade.
 
 function closeLids(eye, side, ew, eh, shift) {
-  const top = clamp((eye.lidTop || 0) + droop, 0, 0.96);
+  const rest = eye.lidTop || 0;
+  const top = clamp(rest + Math.max(0, 0.84 - rest) * droop, 0, 0.96);
   const bot = clamp(eye.lidBot || 0, 0, 0.96);
   const slant = eye.slant || 0;
   if (top < 0.005 && bot < 0.005 && Math.abs(slant) < 0.5) return;
@@ -697,7 +757,7 @@ function drawScanner(fg) {
   ctx.lineJoin = 'round';
 
   // Corners
-  ctx.lineWidth = line(7 * scale);
+  ctx.lineWidth = line(12 * scale);
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
     ctx.beginPath();
     ctx.moveTo(sx * (halfW - arm), sy * halfH);
@@ -706,25 +766,29 @@ function drawScanner(fg) {
     ctx.stroke();
   }
 
-  // Trail: fading lines on the side the bar just left
+  // Trail: rows of dashes thinning out on the side the bar just left.
+  // Dashes, not transparency, so the trail is still there on the pixel grid.
   const inner = halfW - arm * 0.7;
-  ctx.lineWidth = line(3 * scale);
-  for (let i = 1; i <= 4; i++) {
-    const ty = y - scanDir * i * 9 * scale;
-    if (Math.abs(ty) > halfH - arm * 0.3) continue;
-    ctx.globalAlpha = t * (0.5 - i * 0.1);
+  ctx.lineWidth = line(7 * scale);
+  ctx.lineCap = 'butt';
+  [[16, 14], [10, 22], [5, 30]].forEach(([dash, space], i) => {
+    const ty = y - scanDir * (i + 1) * 20 * scale;
+    if (Math.abs(ty) > halfH - arm * 0.3) return;
+    ctx.setLineDash([dash * scale, space * scale]);
+    ctx.lineDashOffset = i * 9 * scale;
     ctx.beginPath(); ctx.moveTo(-inner, ty); ctx.lineTo(inner, ty); ctx.stroke();
-  }
+  });
+  ctx.setLineDash([]);
+  ctx.lineCap = 'round';
 
   // The bar
-  ctx.globalAlpha = t;
-  ctx.lineWidth = line(6 * scale);
+  ctx.lineWidth = line(13 * scale);
   ctx.beginPath(); ctx.moveTo(-inner, y); ctx.lineTo(inner, y); ctx.stroke();
 
   // "I'm looking" light, top right, blinking
   if (Math.floor(time * 2.5) % 2 === 0) {
     ctx.beginPath();
-    ctx.arc(halfW - arm * 0.9, -halfH + arm * 0.9, 7 * scale, 0, Math.PI * 2);
+    ctx.arc(halfW - arm * 1.1, -halfH + arm * 1.1, 13 * scale, 0, Math.PI * 2);
     ctx.fill();
   }
 

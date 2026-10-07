@@ -448,6 +448,20 @@ export function update(dt) {
 export function init(canvasEl) {
   renderer.init(canvasEl);
 
+  // Being stroked: happy arches and hearts while the hand is there, a giggle when it leaves.
+  // Asleep, a stroke wakes it gently instead. Skills holding the face (game, clock) are left alone.
+  renderer.onPet((on) => {
+    if (overrideActive) return;
+    if (on) {
+      if (interrupt()) return;
+      interruptCurrent();
+      enterBehavior('petted');
+    } else if (currentBehaviorName === 'petted') {
+      playChain('petted_end');
+    }
+    bus.emit('face:petted', on);
+  });
+
   // Legacy bus events — map to new API
   bus.on('reaction:trigger', react);
   bus.on('expression:override', (name) => name ? override(name) : releaseOverride());

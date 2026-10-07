@@ -46,17 +46,21 @@ export const catalog = {
   curious_l:    { ...DEFAULT, h: 210, tilt: -5 },
   curious_r:    { ...DEFAULT, h: 168, tilt: 8, lidTop: 0.12 },
   annoyed:      { ...DEFAULT, h: 155, lidTop: 0.45, slant: 10 },
-  wink_closed:  { ...DEFAULT, h: 150, lidBot: 0.86 },
-  sleepy:       { ...DEFAULT, h: 160, lidTop: 0.6 },
+  wink_closed:  { ...DEFAULT, h: 110, lidBot: 0.62 },             // a thick arch at eye level
+  sleepy:       { ...DEFAULT, h: 180, lidTop: 0.48 },             // half shut; `droop` does the rest
+  petted:       { ...DEFAULT, h: 150, lidBot: 0.6 },              // two happy arches
   yawn:         { ...DEFAULT, h: 130, lidTop: 0.2, lidBot: 0.25 },
 
   // ── Drowsy / Sleep (workbench-designed by Gab) ──
-  drowsy:       { ...DEFAULT, h: 100, tl: 20, tr: 20, shiftTop: 80 },
-  drowsy_open:  { ...DEFAULT, h: 140, tl: 25, tr: 25, shiftTop: 50 },
-  drowsy_shut:  { ...DEFAULT, h: 60,  tl: 15, tr: 15, shiftTop: 90 },
-  asleep:       { ...DEFAULT, h: 20,  tl: 20, tr: 20, shiftTop: 80 },
-  exhale:       { ...DEFAULT, h: 22,  tl: 20, tr: 20, shiftTop: 80 },
-  inhale:       { ...DEFAULT, h: 22,  tl: 20, tr: 20, shiftTop: 80, tilt: -10, x: -5 },
+  // Falling asleep: a heavy lid leaning toward the ears, opening and giving in
+  // (the earlier slanted-pill versions are in git history)
+  drowsy:       { ...DEFAULT, h: 180, lidTop: 0.5,  slant: -8 },
+  drowsy_open:  { ...DEFAULT, h: 190, lidTop: 0.3,  slant: -6 },
+  drowsy_shut:  { ...DEFAULT, h: 170, lidTop: 0.74, slant: -8 },
+  // Asleep: only the bottom curve of the eye is left, a closed lid  ‿
+  asleep:       { ...DEFAULT, h: 70, lidTop: 0.64 },
+  exhale:       { ...DEFAULT, h: 70, lidTop: 0.64 },
+  inhale:       { ...DEFAULT, h: 78, lidTop: 0.58, tilt: -10, x: -5 },
 
   // ── Symbols (bypass pill renderer) ──
   // As big as an eye: small thin symbols could not be seen on the screen

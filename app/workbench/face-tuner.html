@@ -65,7 +65,7 @@ pre { margin: 0; overflow-x: auto; background: var(--bg); border: 1px solid var(
   <main class="controls">
     <header>
       <h1>blocky · face tuner</h1>
-      <p class="lede">The app's own renderer inside a medium Android phone. Tune the default proportions, look at every behavior, then copy the numbers. Tap the screen: blocky looks at your finger.</p>
+      <p class="lede">The app's own renderer inside a medium Android phone. Tune the default proportions, look at every behavior, then copy the numbers. Tap the screen: blocky looks at your finger. Rub it: you are stroking blocky.</p>
     </header>
 
     <section class="panel">
@@ -138,11 +138,12 @@ const SLIDERS = [
   ['eyeH',   'Eye height',    60, 320, 1,    'catalog 200'],
   ['gap',    'Eye distance', 150, 700, 5,    'centre to centre, catalog 400'],
   ['zoom',   'Face size',    0.5, 2.2, 0.05, 'whole face on the screen'],
+  ['mouth',  'Mouth size',   0.6, 3,   0.05, 'width and thickness of the mouth'],
   ['symbol', 'Symbol size',  0.5, 1.6, 0.05, 'digits, game pieces, star, heart'],
   ['stroke', 'Symbol stroke', 0.4, 2,  0.05, 'thickness of drawn lines'],
 ];
 
-const KEY = 'blocky-face-tuner-4';
+const KEY = 'blocky-face-tuner-5';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
 const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', tune: { ...PRESETS.blocky }, ...load() };
@@ -190,7 +191,7 @@ function apply() {
 function exportText() {
   const t = state.tune, c = COLORS[state.color];
   return `// face tuner — ${state.orient}, ${state.pixel ? 'pixel grid' : 'smooth'}, ${state.color}, digits ${state.digits}\n` +
-    `faceApi.setProportions({ eyeW: ${t.eyeW}, eyeH: ${t.eyeH}, gap: ${t.gap}, zoom: ${t.zoom}, symbol: ${t.symbol}, stroke: ${t.stroke} });\n` +
+    `faceApi.setProportions({ eyeW: ${t.eyeW}, eyeH: ${t.eyeH}, gap: ${t.gap}, zoom: ${t.zoom}, symbol: ${t.symbol}, stroke: ${t.stroke}, mouth: ${t.mouth} });\n` +
     `faceApi.setPalette({ fg: '${c.fg}', bg: '${c.bg}' });\n` +
     `faceApi.setPixelGrid(${state.pixel ? GRID : 0});`;
 }
