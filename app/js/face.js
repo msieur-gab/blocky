@@ -39,8 +39,9 @@ let grid = null;          // { small, smallCtx, lines } working canvases for the
 // ── Proportions ──
 // The catalog is written for an eye 100 wide, 200 high, centres 400 apart.
 // These say what those three numbers are drawn as, so the whole face can be re-proportioned at once.
+// Values chosen by Gab in workbench/face-tuner.html, 2026-10-07.
 
-const PROPORTIONS = { eyeW: 100, eyeH: 200, gap: 400, zoom: 1, symbol: 1, stroke: 1 };
+const PROPORTIONS = { eyeW: 140, eyeH: 250, gap: 460, zoom: 1.4, symbol: 1, stroke: 1 };
 const prop = { ...PROPORTIONS };
 const wide = () => prop.eyeW / 100;
 const tall = () => prop.eyeH / 200;
@@ -225,6 +226,9 @@ export function resize() {
   cx = W / 2;
   cy = H / 2;
   scale = Math.min(W, H) / 560 * prop.zoom;
+  // …but never so big that the two eyes (or two symbols) run off the sides, as on a phone held upright
+  const across = prop.gap + Math.max(prop.eyeW, 190 * prop.symbol);
+  scale = Math.min(scale, W / (across * 1.12));
 }
 
 // ── Eased interpolation ──

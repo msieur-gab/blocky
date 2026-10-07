@@ -88,7 +88,7 @@ pre { margin: 0; overflow-x: auto; background: var(--bg); border: 1px solid var(
 
     <section class="panel">
       <div class="head"><h2>Default proportions</h2>
-        <div class="row"><button class="act" data-preset="close">Wide and close</button><button class="act" data-preset="original">Original</button></div>
+        <div class="row"><button class="act" data-preset="blocky">Blocky</button><button class="act" data-preset="close">Wide and close</button><button class="act" data-preset="original">Original</button></div>
       </div>
       <div class="sliders" id="sliders"></div>
     </section>
@@ -126,11 +126,11 @@ import { setDigitStyle } from '../js/shapes.js';
 const DP = { short: 412, long: 915 };
 const COLORS = { mint: { fg: '#C6F3E5', bg: '#0B1110' }, cream: { fg: '#d7d0c8', bg: '#0a0a0f' } };
 const TUNE_DEFAULT = api.getProportions();
-// Two starting points. "Wide and close": eyes half as wide again, centres 275 apart instead of 400,
-// and the face enlarged until an eye is half the height of the screen.
+// Starting points. "Blocky" is the renderer's own default; "Original" is what the catalog was written for.
 const PRESETS = {
+  blocky:   { ...TUNE_DEFAULT },
   close:    { ...TUNE_DEFAULT, eyeW: 150, eyeH: 200, gap: 275, zoom: 1.4 },
-  original: { ...TUNE_DEFAULT },
+  original: { ...TUNE_DEFAULT, eyeW: 100, eyeH: 200, gap: 400, zoom: 1 },
 };
 const GRID = 64;   // pixel grid: cells along the short side of the screen
 const SLIDERS = [
@@ -142,10 +142,10 @@ const SLIDERS = [
   ['stroke', 'Symbol stroke', 0.4, 2,  0.05, 'thickness of drawn lines'],
 ];
 
-const KEY = 'blocky-face-tuner-3';
+const KEY = 'blocky-face-tuner-4';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
-const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', tune: { ...PRESETS.close }, ...load() };
+const state = { orient: 'landscape', pixel: true, color: 'mint', digits: 'type', tune: { ...PRESETS.blocky }, ...load() };
 state.tune = { ...TUNE_DEFAULT, ...state.tune };
 
 const $ = id => document.getElementById(id);
