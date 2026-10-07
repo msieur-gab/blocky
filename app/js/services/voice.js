@@ -381,7 +381,8 @@ export const sounds = {
     if (Math.random() > 0.5) {
       tone({ type: 'sine', freq: [405, 975], duration: 1.24, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
     } else {
-      tone({ type: 'sine', freq: [160, 690], duration: 1.24, attack: 0.001, release: 0.55, volume: 4, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
+      // this lower variant loses most of its level in the filter: raised to match the other inhale
+      tone({ type: 'sine', freq: [160, 690], duration: 1.24, attack: 0.001, release: 0.55, volume: 12.5, vibrato: { rate: 14, depth: 56 }, filter: { type: 'highpass', freq: 3390, Q: 12.9 } });
     }
   },
 
