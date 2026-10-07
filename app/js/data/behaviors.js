@@ -11,6 +11,12 @@
 //   loop: array            — internal micro-animation frames (optional)
 //   gap: number            — eye gap override (optional)
 //   pop: number            — jelly jolt on enter: + squash, − stretch (default 1.4)
+//   life: object           — what it does on its own (optional):
+//                              gaze: 'still' | 'up' | 'down' | 'away' | 'shifty'
+//                              show: ['blush' | 'question' | 'dots' | 'stars']
+//                              emit: { deco: 'heart' | 'huff' | 'sweat' | 'tear' | 'z', every: [min, max] ms }
+//                              blink: false
+//   loop / chain frames may carry deco: '…' for a one-shot decoration (e.g. a Z on each snore)
 // ══════════════════════════════════════════
 
 export const catalog = {
@@ -36,12 +42,14 @@ export const catalog = {
   },
 
   sad: {
+    life: { gaze: 'down', emit: { deco: 'tear', every: [2500, 5000] } },
     eyes: { left: 'sad', right: 'sad' },
     mouth: 'frown',
     face: { y: 4, scale: 0.97 },
   },
 
   scared: {
+    life: { gaze: 'shifty' },
     pop: -1.8,
     eyes: 'scared',
     mouth: 'open_small',
@@ -58,12 +66,14 @@ export const catalog = {
   },
 
   bored: {
+    life: { gaze: 'down' },
     pop: 0.8,
     eyes: 'bored',
     face: { y: 10, scale: 0.96 },
   },
 
   angry: {
+    life: { gaze: 'away', emit: { deco: 'huff', every: [2800, 4800] } },
     pop: 2.0,
     eyes: { left: 'angry', right: 'angry' },
     mouth: 'line_down',
@@ -72,6 +82,7 @@ export const catalog = {
   },
 
   surprise: {
+    life: { gaze: 'still', blink: false },
     pop: -2.2,
     eyes: 'surprise',
     mouth: 'open_medium',
@@ -83,16 +94,19 @@ export const catalog = {
   // ── Curiosity ──
 
   curious: {
+    life: { gaze: 'up', show: ['question'] },
     eyes: { left: 'curious_l', right: 'curious_r' },
     face: { tilt: 5 },
   },
 
   curious_b: {
+    life: { gaze: 'up', show: ['question'] },
     eyes: { left: 'curious_r', right: 'curious_l' },
     face: { tilt: -5 },
   },
 
   thinking: {
+    life: { gaze: 'up', show: ['dots'] },
     eyes: { left: 'thinking_l', right: 'thinking_r' },
     mouth: 'line_small',
     face: { tilt: 8 },
@@ -106,6 +120,7 @@ export const catalog = {
   // ── Extended emotions ──
 
   silly: {
+    life: { show: ['blush'] },
     eyes: { left: 'silly_l', right: 'silly_r' },
     mouth: 'smile_big',
     face: { tilt: -4, scale: 1.03 },
@@ -113,18 +128,21 @@ export const catalog = {
   },
 
   love: {
+    life: { show: ['blush'], emit: { deco: 'heart', every: [900, 1800] } },
     eyes: 'love',
     mouth: 'three',
     face: { scale: 1.04 },
   },
 
   embarrassed: {
+    life: { gaze: 'down', show: ['blush'] },
     eyes: 'embarrassed',
     mouth: 'zigzag',
     face: { scale: 0.95, y: 4 },
   },
 
   shocked: {
+    life: { gaze: 'still', blink: false },
     pop: -2.6,
     eyes: 'shocked',
     mouth: 'open_big',
@@ -133,9 +151,16 @@ export const catalog = {
   },
 
   suspicious: {
+    life: { gaze: 'shifty' },
     eyes: { left: 'suspicious_l', right: 'suspicious_r' },
     mouth: 'line_down',
     face: { tilt: -3 },
+  },
+
+  cheating: {
+    eyes: { left: 'suspicious_l', right: 'suspicious_r' },
+    face: { tilt: 4 },
+    life: { gaze: 'shifty', emit: { deco: 'sweat', every: [1800, 3200] } },
   },
 
   determined: {
@@ -146,18 +171,21 @@ export const catalog = {
   },
 
   worried: {
+    life: { gaze: 'down', emit: { deco: 'sweat', every: [2500, 4500] } },
     eyes: { left: 'worried', right: 'worried' },
     mouth: 'frown_small',
     face: { scale: 0.96, y: 6 },
   },
 
   annoyed: {
+    life: { gaze: 'away' },
     eyes: { left: 'annoyed', right: 'annoyed' },
     mouth: 'line_down',
     gap: 390,
   },
 
   sleepy: {
+    life: { gaze: 'down' },
     pop: 0.6,
     eyes: 'sleepy',
     face: { y: 8, scale: 0.95 },
@@ -198,7 +226,7 @@ export const catalog = {
     mouth: 'sleep_exhale',
     face: { y: 8, scale: 0.95 },
     loop: [
-      { eyes: 'exhale', mouth: 'sleep_exhale', dur: 2500, sound: 'snore_exhale', face: { y: 8, scale: 0.95 } },
+      { eyes: 'exhale', mouth: 'sleep_exhale', dur: 2500, sound: 'snore_exhale', deco: 'z', face: { y: 8, scale: 0.95 } },
       { eyes: 'inhale', mouth: 'sleep_inhale', dur: 2500, sound: 'snore_inhale', face: { y: 6, scale: 0.97 } },
     ],
   },
@@ -222,6 +250,7 @@ export const catalog = {
   },
 
   heart_eyes: {
+    life: { emit: { deco: 'heart', every: [700, 1400] } },
     eyes: 'heart',
     mouth: 'three',
     face: { scale: 1.04 },
@@ -241,6 +270,7 @@ export const catalog = {
   },
 
   dizzy: {
+    life: { show: ['stars'] },
     eyes: 'whirl',
     mouth: 'wave',
     face: { tilt: -6 },

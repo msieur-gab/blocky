@@ -54,6 +54,19 @@ const JELLY_C = 9;     // damping    (settles in ~0.5 s, one visible rebound)
 let morphAmt = 0;      // 0 = open, 1 = shut
 let morphPhase = 0;    // 0 idle · 1 closing · 2 opening
 
+// Life — what the current behavior does on its own (see behaviors.js `life`)
+//   gaze: 'still' | 'up' | 'down' | 'away' | 'shifty'   (default: wander)
+//   show: ['blush' | 'question' | 'dots' | 'stars']     drawn while the behavior lasts
+//   emit: { deco: 'heart' | 'huff' | 'sweat' | 'tear' | 'z', every: [minMs, maxMs] }
+//   blink: false                                        wide-eyed stare
+let life = null;
+let lifeAmt = 0;       // fades `show` decorations in and out
+let clock = 0;
+let nextEmit = Infinity;
+let lookingAway = false;
+let shiftSide = 1;
+const particles = [];
+
 // Gaze — autonomous look direction, independent from expression
 let gazeX = 0;         // current gaze offset (-1 to 1)
 let gazeY = 0;
@@ -115,6 +128,31 @@ export function setTheme(dark) { darkTheme = dark; }
 
 // Give the eyes a jolt. Positive squashes, negative stretches (surprise).
 export function kick(impulse = 1.4) { jellyV += impulse; }
+
+const randMs = ([a, b]) => (a + Math.random() * (b - a)) / 1000;
+
+export function setLife(l) {
+  life = l || null;
+  lifeAmt = 0;
+  gazeTimer = 0;
+  lookingAway = false;
+  nextEmit = life?.emit ? clock + randMs(life.emit.every) : Infinity;
+}
+
+// One-shot decoration: a Z, a heart, a huff… (also used by loop / chain frames with `deco`)
+export function spawn(type) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const p = { type, side, age: 0, seed: Math.random() * 10 };
+  switch (type) {
+    case 'z':     p.dur = 2.6; break;
+    case 'heart': p.dur = 2.0; p.x0 = side * (120 + Math.random() * 140); break;
+    case 'huff':  p.dur = 1.0; p.side = gazeX < 0 ? 1 : -1; kick(1.0); break;
+    case 'sweat': p.dur = 1.4; p.side = gazeX > 0 ? -1 : 1; break;
+    case 'tear':  p.dur = 1.2; break;
+    default: return;
+  }
+  particles.push(p);
+}
 export function setAudioRms(rms) { audioRms = rms; }
 export function setScanning(on) { scanning = on; }
 
@@ -220,7 +258,7 @@ export function update(dt, target) {
   jelly = clamp(jelly, -0.35, 0.35);
 
   // Blink — single (70%) or double (30%), disabled during scan and while morphing
-  if (scanAmt < 0.5 && morphPhase === 0) {
+  if (scanAmt < 0.5 && morphPhase === 0 && life?.blink !== false) {
     blinkTimer -= dt;
 
     if (blinkPhase === 0) {
@@ -258,16 +296,52 @@ export function update(dt, target) {
   breathPhase += dt * 1.2;
   driftPhase += dt;
 
-  // Gaze wandering — pick a new target every 2-5s
+  // Gaze — wanders by default; the behavior's life can give it intent
+  clock += dt;
   gazeTimer -= dt;
-  if (gazeTimer <= 0) {
+  let gazeSpeed = 1.5;
+  const mode = life?.gaze;
+  if (mode === 'still') {
+    gazeTargetX = 0; gazeTargetY = 0; gazeSpeed = 4;
+  } else if (mode === 'up') {
+    gazeTargetX = 0.7; gazeTargetY = -0.9; gazeSpeed = 2;
+  } else if (mode === 'down') {
+    if (gazeTimer <= 0) {
+      gazeTargetX = (Math.random() - 0.5) * 0.6; gazeTargetY = 0.8;
+      gazeTimer = 2 + Math.random() * 3;
+    }
+  } else if (mode === 'away') {
+    // sulky: looks away, steals a short glance back now and then
+    if (gazeTimer <= 0) {
+      lookingAway = !lookingAway;
+      gazeTimer = lookingAway ? 2.5 + Math.random() * 2.5 : 0.7;
+    }
+    gazeTargetX = lookingAway ? -1.3 : 0; gazeTargetY = lookingAway ? 0.4 : 0; gazeSpeed = 3;
+  } else if (mode === 'shifty') {
+    // darts left and right, sometimes straight at you
+    if (gazeTimer <= 0) {
+      shiftSide = -shiftSide;
+      gazeTargetX = Math.random() < 0.25 ? 0 : shiftSide * 1.3; gazeTargetY = 0.1;
+      gazeTimer = 0.5 + Math.random() * 0.8;
+    }
+    gazeSpeed = 6;
+  } else if (gazeTimer <= 0) {
     gazeTargetX = (Math.random() - 0.5) * 1.4;
     gazeTargetY = (Math.random() - 0.5) * 0.8;
     gazeTimer = 2 + Math.random() * 3;
   }
   // Ease toward gaze target (slow, organic)
-  gazeX = easedLerp(gazeX, gazeTargetX, 1.5, dt);
-  gazeY = easedLerp(gazeY, gazeTargetY, 1.5, dt);
+  gazeX = easedLerp(gazeX, gazeTargetX, gazeSpeed, dt);
+  gazeY = easedLerp(gazeY, gazeTargetY, gazeSpeed, dt);
+
+  // Life: fade `show` decorations in, emit particles, age them
+  lifeAmt = Math.min(1, lifeAmt + dt * 3);
+  if (life?.emit && clock >= nextEmit) {
+    spawn(life.emit.deco);
+    nextEmit = clock + randMs(life.emit.every);
+  }
+  for (const p of particles) p.age += dt / p.dur;
+  for (let i = particles.length - 1; i >= 0; i--) if (particles[i].age >= 1) particles.splice(i, 1);
 
   // Radio groove — head sway + mouth pulse
   if (radioPlaying) {
@@ -332,6 +406,9 @@ export function draw() {
     drawNormalEyes(fg, gap, skX, skY);
     if (scanAmt > 0.01) ctx.globalAlpha = 1;
   }
+
+  // ── Decorations ── (hidden during scan)
+  if (scanAmt < 0.5) drawDecorations(fg);
 
   // ── Mouth ── (hidden during scan)
   if (face.mouth.show > 0.01 && scanAmt < 0.5) {
@@ -586,5 +663,107 @@ function drawScanEyes(fg, gap, skX, skY) {
   ctx.fillRect(-span * 1.1, lineY - trailH, span * 2.2, trailH * 2);
 
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ── Decorations ──
+// Small signs around the eyes, in Figma units from the face centre (×scale).
+// `show` ones last as long as the behavior; particles come from `emit` or a frame's `deco`.
+
+function drop(x, y, r) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.moveTo(x - r * 0.9, y - r * 0.4);
+  ctx.lineTo(x, y - r * 2.4);
+  ctx.lineTo(x + r * 0.9, y - r * 0.4);
+  ctx.fill();
+}
+
+function heartAt(x, y, s) {
+  ctx.beginPath();
+  ctx.arc(x - s * 0.5, y, s * 0.6, 0, Math.PI * 2);
+  ctx.arc(x + s * 0.5, y, s * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x - s * 1.1, y + s * 0.2);
+  ctx.lineTo(x + s * 1.1, y + s * 0.2);
+  ctx.lineTo(x, y + s * 1.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawDecorations(fg) {
+  const u = scale;
+  const half = face.eyeGap / 2;                     // eye centre, Figma units
+  const eyeW = face.leftEye.w, eyeH = face.leftEye.h;
+  const fade = (a) => Math.min(1, a * 5, (1 - a) * 4);
+
+  ctx.save();
+  ctx.fillStyle = fg;
+  ctx.strokeStyle = fg;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3 * u;
+
+  const show = life?.show || [];
+  ctx.globalAlpha = lifeAmt;
+
+  if (show.includes('blush')) {
+    for (const side of [-1, 1]) {
+      const bx = side * (half + eyeW * 0.5 + 18), by = eyeH * 0.42;
+      for (let i = 0; i < 3; i++) {
+        const x = bx + (i - 1) * 12;
+        ctx.beginPath(); ctx.moveTo((x - 4) * u, (by + 8) * u); ctx.lineTo((x + 4) * u, (by - 8) * u); ctx.stroke();
+      }
+    }
+  }
+  if (show.includes('question')) {
+    ctx.font = `600 ${70 * u}px system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', (half + eyeW * 0.5 + 90) * u, (-eyeH * 0.55 + Math.sin(clock * 4) * 6) * u);
+  }
+  if (show.includes('dots')) {
+    const n = Math.floor(clock * 2.2) % 4;
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.arc((half + 40 + i * 32) * u, (-eyeH * 0.5 - 50) * u, 7 * u, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (show.includes('stars')) {
+    for (let i = 0; i < 3; i++) {
+      const a = clock * 3.5 + i * Math.PI * 2 / 3;
+      if (Math.sin(a) < -0.6) continue;              // behind the head
+      const x = Math.cos(a) * (half + 90), y = -eyeH * 0.5 - 60 + Math.sin(a) * 25;
+      ctx.beginPath();
+      ctx.moveTo((x - 10) * u, y * u); ctx.lineTo((x + 10) * u, y * u);
+      ctx.moveTo(x * u, (y - 10) * u); ctx.lineTo(x * u, (y + 10) * u);
+      ctx.stroke();
+    }
+  }
+
+  for (const p of particles) {
+    const a = p.age;
+    ctx.globalAlpha = fade(a);
+    if (p.type === 'z') {
+      const size = 30 + a * 30;
+      ctx.font = `700 ${size * u}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Z', (half + 60 + a * 70) * u, (-eyeH * 0.4 - a * 150) * u);
+    } else if (p.type === 'heart') {
+      const x = p.x0 + Math.sin(a * 9 + p.seed) * 12, y = -eyeH * 0.5 - 20 - a * 140;
+      heartAt(x * u, y * u, (12 + a * 6) * u);
+    } else if (p.type === 'huff') {
+      const x = p.side * (half + eyeW * 0.5 + 40 + a * 70), y = eyeH * 0.25 - a * 20;
+      const r = 12 + a * 10;
+      for (const [dx, dy, k] of [[0, 0, 1], [p.side * 18, -10, 0.8], [p.side * 32, 4, 0.6]]) {
+        ctx.beginPath(); ctx.arc((x + dx) * u, (y + dy) * u, r * k * u, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (p.type === 'sweat') {
+      const x = p.side * (half + eyeW * 0.5 + 30), y = -eyeH * 0.3 + a * 50;
+      drop(x * u, y * u, 9 * u);
+    } else if (p.type === 'tear') {
+      const x = half * (p.side) + p.side * eyeW * 0.25, y = eyeH * 0.5 + 10 + a * a * 160;
+      drop(x * u, y * u, 8 * u);
+    }
+  }
+
   ctx.restore();
 }
