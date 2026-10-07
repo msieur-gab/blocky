@@ -10,6 +10,7 @@ import * as sensors from './services/sensors.js';
 import * as camera from './services/camera.js';
 import * as faces from './services/faces.js';
 import * as intent from './services/intent.js';
+import * as display from './services/display.js';
 import * as nlu from './services/nlu.js';
 import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
@@ -295,6 +296,9 @@ const startGate = $('start-gate');
 
 startGate.addEventListener('click', async () => {
   startGate.classList.add('hidden');
+
+  // Screen awake, and on a phone full screen on its side — asked first, while the tap still counts
+  display.hold();
 
   // These need user gesture
   sensors.init();

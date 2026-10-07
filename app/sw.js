@@ -46,7 +46,9 @@ async function keptFirst(req) {
 async function networkFirst(req) {
   const cache = await caches.open(APP);
   try {
-    const res = await fetch(req);
+    // 'no-cache': ask the server each time whether the file changed. The host lets browsers keep
+    // a file for ten minutes, each on its own clock: old and new code could run together.
+    const res = await fetch(req, { cache: 'no-cache' });
     if (res.ok) cache.put(req, res.clone()).catch(() => {});
     return res;
   } catch (err) {
