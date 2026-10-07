@@ -145,11 +145,15 @@ async function startActive() {
   if (stage === 'active') return;
 
   try {
-    audioCtx = new AudioContext({ sampleRate: 16000 });
-    if (audioCtx.sampleRate !== 16000) {
-      console.warn('[ears-onnx] AudioContext gave', audioCtx.sampleRate,
-                   'Hz; sherpa expects 16000. Audio will be resampled by the browser.');
+    // Some Android WebViews reject the sampleRate hint outright; fall back
+    // to the device default and let the worklet resample to 16k.
+    try {
+      audioCtx = new AudioContext({ sampleRate: 16000 });
+    } catch (e) {
+      console.warn('[ears-onnx] AudioContext({sampleRate:16000}) rejected, using default:', e.message);
+      audioCtx = new AudioContext();
     }
+    console.log('[ears-onnx] AudioContext rate=', audioCtx.sampleRate, 'state=', audioCtx.state);
 
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     sourceNode = audioCtx.createMediaStreamSource(mediaStream);
@@ -162,18 +166,31 @@ async function startActive() {
     workletNode = new AudioWorkletNode(audioCtx, 'capture-processor', {
       numberOfInputs: 1,
       numberOfOutputs: 0,
+      processorOptions: { targetRate: 16000 },
     });
 
+    let frameCount = 0;
     workletNode.port.onmessage = (e) => {
-      // e.data is the Float32Array of samples (transferred from worklet).
-      // Forward straight to the worker, transferring the buffer again.
       const samples = e.data;
+      frameCount++;
+      if (frameCount === 1 || frameCount % 200 === 0) {
+        console.log('[ears-onnx] worklet→main frame', frameCount, 'len=', samples.length);
+      }
       if (worker) {
         worker.postMessage({ type: 'audio', samples }, [samples.buffer]);
       }
     };
 
     sourceNode.connect(workletNode);
+
+    // Android WebView often delivers the AudioContext in 'suspended' state
+    // even with mediaPlaybackRequiresUserGesture=false. Resume explicitly.
+    if (audioCtx.state === 'suspended') {
+      try { await audioCtx.resume(); } catch (e) {
+        console.warn('[ears-onnx] resume() failed:', e.message);
+      }
+    }
+    console.log('[ears-onnx] post-connect state=', audioCtx.state);
 
     stage = 'active';
     bus.emit('ear:listening');
