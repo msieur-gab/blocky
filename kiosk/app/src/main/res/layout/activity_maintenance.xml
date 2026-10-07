@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="?android:colorBackground">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="32dp">
+
+        <LinearLayout
+            android:id="@+id/pin_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/pin_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/pin_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:gravity="center"
+                android:textColor="?android:textColorSecondary" />
+
+            <EditText
+                android:id="@+id/pin_input"
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:textSize="28sp"
+                android:gravity="center"
+                android:maxLength="6"
+                android:hint="••••••"
+                android:autofillHints="@null"
+                android:importantForAutofill="no"
+                android:layout_marginBottom="16dp" />
+
+            <Button
+                android:id="@+id/pin_submit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pin_submit" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/menu_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/menu_title"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="24dp" />
+
+            <Button
+                android:id="@+id/action_wipe"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/wipe_title"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/action_change_pin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/change_pin"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/action_change_url"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/change_url"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/action_return"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/return_to_kiosk"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/action_exit_kiosk"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/exit_kiosk_title"
+                android:textColor="#888888" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/url_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/url_title"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/url_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/url_subtitle"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginBottom="16dp" />
+
+            <EditText
+                android:id="@+id/url_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textUri"
+                android:autofillHints="@null"
+                android:importantForAutofill="no"
+                android:hint="http://studio.local"
+                android:layout_marginBottom="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/url_cancel"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/cancel"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/url_save"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/url_save"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</ScrollView>
