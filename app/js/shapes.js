@@ -113,22 +113,21 @@ export const eyes = {
     ctx.fill();
   },
 
-  // Music note — filled circle + stem
+  // Music note — a big head, a stem, and a tail that sweeps up and away so it reads from afar
   musicNote(ctx, w, h) {
-    const r = Math.min(w, h) * 0.4;
+    const r = Math.min(w, h) * 0.5;
+    const headX = -w * 0.3, headY = h * 0.58;
+    const stemX = headX + r * 0.8, stemTop = -h * 0.4;
+    ctx.lineWidth *= 1.5;
     // Note head
     ctx.beginPath();
-    ctx.ellipse(-r * 0.2, r * 0.3, r, r * 0.7, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(headX, headY, r, r * 0.72, -0.35, 0, Math.PI * 2);
     ctx.fill();
-    // Stem
+    // Stem, then the tail rising to the upper right
     ctx.beginPath();
-    ctx.moveTo(r * 0.7, r * 0.1);
-    ctx.lineTo(r * 0.7, -h * 0.9);
-    ctx.stroke();
-    // Flag
-    ctx.beginPath();
-    ctx.moveTo(r * 0.7, -h * 0.9);
-    ctx.quadraticCurveTo(r * 1.6, -h * 0.5, r * 0.7, -h * 0.2);
+    ctx.moveTo(stemX, headY - r * 0.2);
+    ctx.lineTo(stemX, stemTop);
+    ctx.quadraticCurveTo(stemX + w * 0.4, stemTop - h * 0.05, w * 0.85, -h * 0.82);
     ctx.stroke();
   },
 
