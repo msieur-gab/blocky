@@ -7,6 +7,7 @@
 //   Mode — { intro: [...], hold: 'behavior', outro: [...] }
 //
 // Each step: { behavior: string, dur: number (ms) }
+//   optional per step: sound, face, head (a gesture from gestures.js), emit (one sign)
 // No dur = terminal (stay until interrupted)
 // ══════════════════════════════════════════
 
@@ -97,7 +98,7 @@ export const catalog = {
 
   shaken: {
     steps: [
-      { behavior: 'dizzy', dur: 600, sound: 'warble' },
+      { behavior: 'dizzy', dur: 2200, sound: 'warble' },
       { behavior: 'silly', dur: 400, sound: 'giggle' },
     ],
   },
@@ -274,22 +275,13 @@ export const catalog = {
 
   agree: {
     steps: [
-      { behavior: 'calm', dur: 120, face: { y: -8 } },
-      { behavior: 'calm', dur: 120, face: { y: 10 }, sound: 'chirp_short' },
-      { behavior: 'calm', dur: 120, face: { y: -6 } },
-      { behavior: 'calm', dur: 120, face: { y: 8 } },
-      { behavior: 'calm', dur: 100, face: { y: -3 } },
+      { behavior: 'calm', dur: 900, head: 'nod', sound: 'chirp_short' },
     ],
   },
 
   agree_strong: {
     steps: [
-      { behavior: 'happy', dur: 90, face: { y: -14 }, sound: 'chirp_up' },
-      { behavior: 'happy', dur: 90, face: { y: 16 } },
-      { behavior: 'happy', dur: 90, face: { y: -14 } },
-      { behavior: 'happy', dur: 90, face: { y: 16 }, sound: 'chirp_up' },
-      { behavior: 'happy', dur: 90, face: { y: -12 } },
-      { behavior: 'happy', dur: 90, face: { y: 14 } },
+      { behavior: 'happy', dur: 1100, head: 'nod_strong', sound: 'chirp_up' },
       { behavior: 'happy', dur: 300 },
     ],
   },
@@ -297,31 +289,19 @@ export const catalog = {
   agree_hesitant: {
     steps: [
       { behavior: 'thinking', dur: 500, sound: 'hum' },
-      { behavior: 'calm',     dur: 120, face: { y: -5 } },
-      { behavior: 'calm',     dur: 120, face: { y: 8 }, sound: 'chirp_short' },
+      { behavior: 'calm',     dur: 900, head: 'nod', sound: 'chirp_short' },
     ],
   },
 
   disagree: {
     steps: [
-      { behavior: 'calm', dur: 100, face: { x: 14 }, sound: 'hum' },
-      { behavior: 'calm', dur: 100, face: { x: -14 } },
-      { behavior: 'calm', dur: 100, face: { x: 12 } },
-      { behavior: 'calm', dur: 100, face: { x: -12 } },
-      { behavior: 'calm', dur: 100, face: { x: 5 } },
+      { behavior: 'calm', dur: 1000, head: 'shake', sound: 'hum' },
     ],
   },
 
   disagree_strong: {
     steps: [
-      { behavior: 'calm', dur: 80, face: { x: 22 }, sound: 'grumble' },
-      { behavior: 'calm', dur: 80, face: { x: -22 } },
-      { behavior: 'calm', dur: 80, face: { x: 20 } },
-      { behavior: 'calm', dur: 80, face: { x: -20 } },
-      { behavior: 'calm', dur: 80, face: { x: 16 } },
-      { behavior: 'calm', dur: 80, face: { x: -16 }, sound: 'grumble' },
-      { behavior: 'calm', dur: 80, face: { x: 10 } },
-      { behavior: 'calm', dur: 80, face: { x: -10 } },
+      { behavior: 'annoyed', dur: 1300, head: 'shake_strong', sound: 'grumble' },
     ],
   },
 

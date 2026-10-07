@@ -20,13 +20,14 @@ import { play as playSound } from './services/voice.js';
 // ══════════════════════════════════════════
 
 const FACE_DEFAULT = { x: 0, y: 0, scale: 1, tilt: 0, squash: 0, skewX: 0, skewY: 0 };
+const GAP_DEFAULT = 400;
 
 const target = {
   left:  { ...EYE_DEFAULT },
   right: { ...EYE_DEFAULT },
   mouth: { ...MOUTH_DEFAULT },
   face:  { ...FACE_DEFAULT },
-  gap: 400,
+  gap: GAP_DEFAULT,
 };
 
 // Behavior player
@@ -50,6 +51,7 @@ let gesture = null;
 let gestureIndex = 0;
 let gestureTimer = 0;
 const gestureOffset = { x: 0, y: 0, tilt: 0, scale: 0 };
+const headWave = { x: 0, y: 0, tilt: 0, scale: 0, turn: 0 };   // wave gestures: sent to the renderer as is
 
 // Override (for skills like game/radio that need direct control)
 let overrideActive = false;
@@ -110,16 +112,24 @@ function enterBehavior(name, stepOverrides) {
   const b = BEHAVIORS[name];
   if (!b) { console.warn(`[face-api] Unknown behavior: ${name}`); return; }
 
+  // A new behavior makes the eyes bounce and brings its own habits
+  if (name !== currentBehaviorName) {
+    renderer.nudge(b.jolt ?? 0.1);
+    renderer.setHabits(b.habits);
+  }
+
   currentBehavior = b;
   currentBehaviorName = name;
 
   setEyes(b.eyes);
   setMouth(b.mouth || 'none');
   if (b.face) setFace(b.face);
-  if (b.gap !== undefined) target.gap = b.gap;
+  target.gap = b.gap ?? GAP_DEFAULT;
 
-  // Step overrides from chain (sound, face)
+  // Step overrides from chain (sound, face, head gesture, one sign)
   if (stepOverrides?.face) setFace({ ...b.face, ...stepOverrides.face });
+  if (stepOverrides?.head) playGesture(stepOverrides.head);
+  if (stepOverrides?.emit) renderer.emit(stepOverrides.emit);
   const sound = stepOverrides?.sound || b.sound;
   if (sound) playSound(sound);
 
@@ -140,6 +150,7 @@ function applyLoopFrame(frame) {
   if (frame.mouth) setMouth(frame.mouth);
   if (frame.face) setFace(frame.face);
   if (frame.sound) playSound(frame.sound);
+  if (frame.emit) renderer.emit(frame.emit);
 }
 
 function updateBehavior(dt) {
@@ -280,7 +291,7 @@ function playGesture(name) {
   gesture = g;
   gestureIndex = 0;
   gestureTimer = 0;
-  applyGestureFrame(g[0]);
+  if (Array.isArray(g)) applyGestureFrame(g[0]);
   bus.emit('face:gesture', name);
 }
 
@@ -293,6 +304,8 @@ function applyGestureFrame(frame) {
 }
 
 function updateGesture(dt) {
+  headWave.x = headWave.y = headWave.turn = 0;
+
   if (!gesture) {
     gestureOffset.x *= 0.85;
     gestureOffset.y *= 0.85;
@@ -302,6 +315,22 @@ function updateGesture(dt) {
   }
 
   gestureTimer += dt * 1000;
+
+  // Wave gesture (yes / no): a swing that swells in and fades out
+  if (!Array.isArray(gesture)) {
+    const t = gestureTimer / gesture.dur;
+    if (t >= 1) { gesture = null; return; }
+    const swell = Math.sin(Math.PI * t) ** 0.7;
+    const swing = Math.sin(2 * Math.PI * gesture.swings * t) * swell;
+    if (gesture.axis === 'x') {
+      headWave.x = swing * gesture.amp;
+      headWave.turn = swing * (gesture.turn || 0);
+    } else {
+      headWave.y = swing * gesture.amp;
+    }
+    return;
+  }
+
   const frame = gesture[gestureIndex];
 
   if (gestureTimer >= frame.dur) {
@@ -346,6 +375,8 @@ export function override(behaviorName) {
 export function overrideRaw(obj) {
   overrideActive = true;
   interruptCurrent();
+  currentBehaviorName = null;      // whatever comes next is a new behavior again
+  renderer.setHabits({ gaze: 'hold' });
   if (obj) {
     // Accept both old format (leftEye/rightEye/eyeGap) and new (left/right/gap)
     const l = obj.left || obj.leftEye;
@@ -430,6 +461,14 @@ export function init(canvasEl) {
 export function resize() { renderer.resize(); }
 export function setTheme(dark) { renderer.setTheme(dark); }
 
+// Look and proportions (see face.js)
+export function setPalette(p) { renderer.setPalette(p); }
+export function setPixelGrid(cells) { renderer.setPixelGrid(cells); }
+export function setProportions(p) { renderer.setProportions(p); }
+export function getProportions() { return renderer.getProportions(); }
+export function lookAt(x, y, seconds) { renderer.lookAt(x, y, seconds); }
+export function emit(sign) { renderer.emit(sign); }
+
 export function render(dt) {
   // Apply gesture offset to face target before rendering
   const renderTarget = {
@@ -442,6 +481,7 @@ export function render(dt) {
       scale: (target.face.scale || 1) * (1 + gestureOffset.scale),
     },
   };
+  renderer.setHead(headWave);
   renderer.update(dt, renderTarget);
   renderer.draw();
 }

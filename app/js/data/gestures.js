@@ -2,53 +2,20 @@
 // Head Gestures Catalog
 // Face-only movements — play as overlay on any behavior
 // Each frame: { dur, x?, y?, tilt?, scale?, sound? }
+// or a wave: { axis, swings, amp, dur, turn? }  (see Yes / No)
 // ══════════════════════════════════════════
 
 export const catalog = {
 
   // ── Yes / No ──
+  // Waves, not frames: the head swings `swings` times over `dur` ms, swelling in and fading out.
+  // axis 'y' nods. axis 'x' shakes, and the face turns with it: the eye it turns toward
+  // shrinks a little, the other grows, like a head seen from the front.
 
-  nod: [
-    { dur: 120, y: -8 },
-    { dur: 120, y: 10 },
-    { dur: 120, y: -6 },
-    { dur: 120, y: 8 },
-    { dur: 100, y: -3 },
-    { dur: 200 },
-  ],
-
-  nod_strong: [
-    { dur: 90, y: -14 },
-    { dur: 90, y: 16 },
-    { dur: 90, y: -14 },
-    { dur: 90, y: 16 },
-    { dur: 90, y: -12 },
-    { dur: 90, y: 14 },
-    { dur: 90, y: -10 },
-    { dur: 90, y: 12 },
-    { dur: 200 },
-  ],
-
-  shake: [
-    { dur: 100, x: 14, scale: -0.1 },
-    { dur: 100, x: -14, scale: -0.1 },
-    { dur: 100, x: 12, scale: -0.08 },
-    { dur: 100, x: -12, scale: -0.08 },
-    { dur: 100, x: 5, scale: -0.03 },
-    { dur: 200 },
-  ],
-
-  shake_strong: [
-    { dur: 80, x: 22, scale: -0.1 },
-    { dur: 80, x: -22, scale: -0.1 },
-    { dur: 80, x: 20, scale: -0.1 },
-    { dur: 80, x: -20, scale: -0.1 },
-    { dur: 80, x: 16, scale: -0.08 },
-    { dur: 80, x: -16, scale: -0.08 },
-    { dur: 80, x: 10, scale: -0.05 },
-    { dur: 80, x: -10, scale: -0.05 },
-    { dur: 200 },
-  ],
+  nod:          { axis: 'y', swings: 2.5, amp: 20, dur: 900 },
+  nod_strong:   { axis: 'y', swings: 4,   amp: 30, dur: 1100 },
+  shake:        { axis: 'x', swings: 2,   amp: 34, dur: 1000, turn: 0.5 },
+  shake_strong: { axis: 'x', swings: 3.5, amp: 46, dur: 1300, turn: 0.7 },
 
   // ── Curiosity ──
 
