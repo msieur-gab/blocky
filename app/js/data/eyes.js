@@ -66,7 +66,7 @@ export const catalog = {
   // As big as an eye: small thin symbols could not be seen on the screen
   star:         { ...DEFAULT, shape: 'star',      w: 160, h: 160 },
   heart:        { ...DEFAULT, shape: 'heart',     w: 170, h: 170 },
-  musicNote:    { ...DEFAULT, shape: 'musicNote', w: 170, h: 200 },
+  musicNote:    { ...DEFAULT, shape: 'musicNote', w: 190, h: 190 },
   whirl:        { ...DEFAULT, shape: 'whirl',     w: 170, h: 170 },
   cross:        { ...DEFAULT, shape: 'cross',     w: 130, h: 130 },
 

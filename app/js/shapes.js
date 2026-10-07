@@ -113,22 +113,38 @@ export const eyes = {
     ctx.fill();
   },
 
-  // Music note — a big head, a stem, and a tail that sweeps up and away so it reads from afar
+  // Music note — two notes joined by a thick beam that climbs to the right (♫)
   musicNote(ctx, w, h) {
-    const r = Math.min(w, h) * 0.5;
-    const headX = -w * 0.3, headY = h * 0.58;
-    const stemX = headX + r * 0.8, stemTop = -h * 0.4;
-    ctx.lineWidth *= 1.5;
-    // Note head
+    const r = Math.min(w, h) * 0.3;
+    const notes = [
+      { x: -w * 0.52, y: h * 0.7,  top: -h * 0.5 },
+      { x:  w * 0.4,  y: h * 0.52, top: -h * 0.72 },
+    ];
+    const beam = h * 0.3;
+    ctx.lineWidth *= 1.3;
+    ctx.lineCap = 'butt';
+    for (const n of notes) {
+      n.stem = n.x + r * 0.8;
+      // Head
+      ctx.beginPath();
+      ctx.ellipse(n.x, n.y, r, r * 0.75, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      // Stem
+      ctx.beginPath();
+      ctx.moveTo(n.stem, n.y);
+      ctx.lineTo(n.stem, n.top + beam / 2);
+      ctx.stroke();
+    }
+    // Beam
+    const half = ctx.lineWidth / 2;
+    const [a, b] = notes;
     ctx.beginPath();
-    ctx.ellipse(headX, headY, r, r * 0.72, -0.35, 0, Math.PI * 2);
+    ctx.moveTo(a.stem - half, a.top);
+    ctx.lineTo(b.stem + half, b.top);
+    ctx.lineTo(b.stem + half, b.top + beam);
+    ctx.lineTo(a.stem - half, a.top + beam);
+    ctx.closePath();
     ctx.fill();
-    // Stem, then the tail rising to the upper right
-    ctx.beginPath();
-    ctx.moveTo(stemX, headY - r * 0.2);
-    ctx.lineTo(stemX, stemTop);
-    ctx.quadraticCurveTo(stemX + w * 0.4, stemTop - h * 0.05, w * 0.85, -h * 0.82);
-    ctx.stroke();
   },
 
   // Whirl / spiral — two loose turns, so a thick stroke still leaves room between them
