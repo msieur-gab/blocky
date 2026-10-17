@@ -18,7 +18,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const names = await caches.keys();
-    await Promise.all(names.filter(n => n !== ASSETS && n !== APP).map(n => caches.delete(n)));
+    await Promise.all(names.filter(n => n.startsWith('blocky-') && n !== ASSETS && n !== APP).map(n => caches.delete(n)));
     await self.clients.claim();
   })());
 });
