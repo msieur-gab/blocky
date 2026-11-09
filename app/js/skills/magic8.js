@@ -1,14 +1,18 @@
 // ══════════════════════════════════════════
 // Magic 8-Ball Skill
-// Persistent mode: reacts to EVERY sentence
-// with a random yes/no/maybe — pure fun
-// Say "stop" to exit
+// One question per call: "tell me the future" → blocky waits for the question (no name
+// needed, see ctx.expectReply) → yes / no / maybe → back to presence.
+// No question within REPLY_MS, or "stop": it ends without answering.
+// (Was a persistent mode answering every sentence until "stop"; changed 2026-11-09 with the
+// name gate, where it held blocky and swallowed every other request.)
 // ══════════════════════════════════════════
 
 let ctx = null;
 let active = false;
 let answering = false;
 let sentenceUnsub = null;
+let replyTimer = null;
+const REPLY_MS = 10000;        // how long blocky waits for the question
 
 // ── Answer pools ──
 
@@ -94,32 +98,48 @@ export default {
     ctx.face.react('magic8_thinking');
     ctx.memory.log({ data: { event: 'started' } });
 
-    // Listen directly to raw sentences — bypass NLU entirely
+    // The next sentence is the question, raw — bypass NLU entirely
     sentenceUnsub = ctx.bus.onGlobal('ear:sentence', onSentence);
-    // Fallback for legacy speech service
-    ctx.bus.onGlobal('speech:sentence', onSentence);
+    ctx.expectReply(REPLY_MS);
+    replyTimer = setTimeout(() => { console.log('[magic8] No question heard'); finish(); }, REPLY_MS + 500);
 
-    console.log('[magic8] Mode active — ask me anything');
+    console.log('[magic8] Waiting for one question');
   },
 
   deactivate() {
-    active = false;
-    answering = false;
-    if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
+    cleanup();
     ctx?.memory.log({ data: { event: 'stopped' } });
     ctx = null;
-    console.log('[magic8] Mode ended');
+    console.log('[magic8] Ended');
   },
 
   handleIntent(intent) {
     if (!active) return false;
     if (intent === 'stop') {
-      this.deactivate();
+      finish();
       return true;
     }
-    return true; // swallow all intents while active
+    // The question itself is classified too: keep it here while it is being answered
+    return answering || !!replyTimer;
   },
 };
+
+function cleanup() {
+  active = false;
+  answering = false;
+  if (replyTimer) { clearTimeout(replyTimer); replyTimer = null; }
+  if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
+}
+
+// Done: hand blocky back to presence (and to waiting for its name)
+function finish() {
+  const c = ctx;
+  cleanup();
+  ctx = null;
+  c?.memory.log({ data: { event: 'stopped' } });
+  c?.done();
+  console.log('[magic8] Ended');
+}
 
 function onSentence(sentence) {
   if (!active || !ctx || answering) return;
@@ -127,11 +147,12 @@ function onSentence(sentence) {
   const text = sentence.toLowerCase().trim();
   if (!text) return;
 
-  // Check for stop
+  // One question per call: stop listening for more
+  if (replyTimer) { clearTimeout(replyTimer); replyTimer = null; }
+  if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
+
   if (text.includes('stop') || text.includes('enough') || text.includes('exit')) {
-    ctx = null;
-    active = false;
-    if (sentenceUnsub) { sentenceUnsub(); sentenceUnsub = null; }
+    finish();
     return;
   }
 
@@ -157,6 +178,8 @@ function answer(text) {
       if (!ctx || !active) { answering = false; return; }
       ctx.face.react(a.reaction);
       answering = false;
+      // Let the answer show before blocky goes back to its own life
+      setTimeout(() => { if (ctx && active && !answering) finish(); }, 2500);
     }, 200);
 
     const type = YES.includes(a) ? 'yes' : NO.includes(a) ? 'no' : 'maybe';

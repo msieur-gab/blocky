@@ -70,6 +70,9 @@ function makeContext(skill) {
     },
     state, // read-only reference to kernel state
 
+    // This skill has asked something: the next sentence is for it, name or not (ears-onnx gate)
+    expectReply: (ms) => bus.emit('ear:expect', { ms }),
+
     // Signal the kernel this skill is done — returns to presence
     done: () => {
       if (activeSkill === skill) {

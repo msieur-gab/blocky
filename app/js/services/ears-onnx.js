@@ -64,6 +64,9 @@ const ARM_MS = 6000;           // how long blocky waits for a sentence after hea
 // skeleton they share: (a)(b) + l or r + o / oo / ou + k + an "ee" ending.
 // It also takes rocky, rookie and looky, which are real words: the price of a name the model does not know.
 const NAME_SHAPE = "a?b?[lr](?:o|oo|ou)c?k{1,2}(?:y|ie|ey|i|ee|\\s+e)";
+// Heard from Gab on 2026-11-09 on the Pixel 5: "blocking play some music", "blocking let's play
+// game". "blocking" is a real word, so it counts only where the name is said: first in the sentence.
+const FIRST_SHAPE = "b[lr]o(?:c?k{1,2})(?:ing|in)";
 let nameRe = null;             // built in init(), once the creature's own name is known
 let armedUntil = 0;
 let restTimer = null;
@@ -96,7 +99,7 @@ export async function init() {
     nameRe = buildNameRe();
     try {
       // The microphone needs the tap; the model does not, and is usually ready by now
-      await Promise.all([loading, startActive()]);
+      await Promise.all([loading, startActiveRetry()]);
       console.log(`[ears-onnx] Listening (creature: ${creatureName || 'none'}, name gate: ${GATE ? 'on' : 'off'})`);
       bus.emit('ear:ready');
     } catch (e) {
@@ -193,6 +196,21 @@ function startWorker() {
 }
 
 // ── Active stage (capture + forward) ──
+
+// Opening the microphone sometimes fails once with an AbortError in GeckoView (seen right
+// after the app was restarted, the old instance still holding the mic): try again once.
+async function startActiveRetry() {
+  try {
+    await startActive();
+  } catch (e) {
+    if (e && (e.name === 'NotAllowedError' || (e.message || '').includes('permission'))) throw e;
+    console.warn('[ears-onnx] microphone did not open, trying again in 1 s:', e?.message);
+    stopActive();
+    stage = 'off';
+    await new Promise(r => setTimeout(r, 1000));
+    await startActive();
+  }
+}
 
 async function startActive() {
   if (stage === 'active') return;
@@ -291,7 +309,8 @@ function buildNameRe() {
   const names = [NAME_SHAPE];
   if (creatureName) names.push(creatureName.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
   // with the small word the recognizer likes to put in front ("a brookie", "hey blocky")
-  return new RegExp(`\\b(?:(?:hey|hi|oh|ok|okay|a|the)\\s+)?(?:${names.join('|')})\\b`, 'g');
+  const before = '(?:(?:hey|hi|oh|ok|okay|a|the)\\s+)?';
+  return new RegExp(`^${before}(?:${FIRST_SHAPE})\\b|\\b${before}(?:${names.join('|')})\\b`, 'g');
 }
 
 function named(text) { nameRe.lastIndex = 0; return nameRe.test(text); }
@@ -299,11 +318,11 @@ function armed() { return performance.now() < armedUntil; }
 
 // Open (or keep open) the listening window. 'ami:wake' is sent once when it opens,
 // 'ami:rest' once when it closes: the radio pauses on the first and resumes on the second.
-function arm() {
+function arm(ms = ARM_MS) {
   const wasArmed = armed();
-  armedUntil = performance.now() + ARM_MS;
+  armedUntil = performance.now() + ms;
   if (restTimer) clearTimeout(restTimer);
-  restTimer = setTimeout(rest, ARM_MS);
+  restTimer = setTimeout(rest, ms);
   if (!wasArmed) {
     console.log('[ears-onnx] → listening (name heard)');
     bus.emit('ami:wake', { name: creatureName });
@@ -317,6 +336,10 @@ function rest() {
   console.log('[ears-onnx] ← resting (waiting for the name)');
   bus.emit('ami:rest');
 }
+
+// A skill that has just asked something (the fortune teller's "ask me anything") takes the
+// answer without the name: the window opens for one sentence, then blocky waits for its name again.
+bus.on('ear:expect', ({ ms } = {}) => { if (GATE) arm(ms || ARM_MS); });
 
 // ── Result handlers ──
 
@@ -341,6 +364,9 @@ function handleSentence(text) {
   let sentence = normalize(text);
   if (!sentence) return;
   let closing = false;         // this sentence is the one blocky was called for
+  // Every sentence, with whether the name was found: the way to learn how the recognizer
+  // writes "blocky" for a given voice (?console=post brings it to logcat on the phone).
+  console.log(`[ears-onnx] heard "${sentence}"${GATE ? ` (name: ${named(sentence) ? 'yes' : 'no'})` : ''}`);
 
   if (GATE) {
     if (named(sentence)) {
@@ -350,6 +376,10 @@ function handleSentence(text) {
       // Otherwise the name is taken out, so it does not weigh on the intent.
       const rest = sentence.replace(nameRe, ' ').replace(/\s+/g, ' ').trim();
       if (rest) { sentence = rest; closing = true; }
+      // The name alone, however it was written ("a blocking", "a brookie"), is passed on as
+      // "blocky": intent.js knows that word (blocky looks up, a game goes on). Passed on as
+      // heard, "a blocking" went to the NLU, came back as "look" and ended a game (2026-11-09).
+      else sentence = 'blocky';
     } else if (armed()) {
       closing = true;
     } else {
@@ -359,16 +389,17 @@ function handleSentence(text) {
     }
   }
 
+  // One call, one sentence: the window closes once blocky has what it was called for.
+  // Left open, it would let through whatever comes next (the radio it just started, for one).
+  // Closed before the sentence is passed on, so a skill it starts can open it again (ear:expect).
+  if (closing) rest();
+
   aside = '';
   history.push(sentence);
   while (history.length > MAX_HISTORY) history.shift();
   lastInterim = '';
   bus.emit('ear:sentence', sentence);
   bus.emit('ear:transcript', getDisplayTranscript());
-
-  // One call, one sentence: the window closes once blocky has what it was called for.
-  // Left open, it would let through whatever comes next (the radio it just started, for one).
-  if (closing) rest();
 }
 
 function getDisplayTranscript() {
