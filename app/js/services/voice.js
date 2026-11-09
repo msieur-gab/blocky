@@ -23,7 +23,16 @@ export function init() {
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   masterGain = ctx.createGain();
   masterGain.gain.value = VOICE.volume;
-  masterGain.connect(ctx.destination);
+  // A limiter before the speaker: a face's own sound and a skill's sound often start together,
+  // and their sum went over full scale and crackled (heard on the Pixel 5, 2026-11-09).
+  // Alone, a sound stays under the threshold and passes unchanged.
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -6;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.002;
+  limiter.release.value = 0.1;
+  masterGain.connect(limiter).connect(ctx.destination);
   synthInit(ctx, masterGain);
 }
 

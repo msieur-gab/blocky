@@ -7,6 +7,11 @@
 let ctx = null;
 let master = null;
 
+// Every sound starts this far ahead of the audio clock. Scheduled at exactly "now", a busy
+// page (camera, speech model) reached the audio thread after that moment had passed: the
+// fade-in was skipped and the sound began with a click.
+const LEAD = 0.02;
+
 export function init(audioCtx, masterGain) {
   ctx = audioCtx;
   master = masterGain;
@@ -22,7 +27,7 @@ export function getOut() { return master; }
 
 export function tone(opts = {}) {
   const c = ctx;
-  const t = c.currentTime + (opts.delay || 0);
+  const t = c.currentTime + LEAD + (opts.delay || 0);
   const dur = opts.duration || 0.3;
   const type = opts.type || 'sine';
   const vol = opts.volume || 1;
@@ -92,7 +97,7 @@ export function tone(opts = {}) {
 
 export function noise(opts = {}) {
   const c = ctx;
-  const t = c.currentTime + (opts.delay || 0);
+  const t = c.currentTime + LEAD + (opts.delay || 0);
   const dur = opts.duration || 0.2;
   const vol = opts.volume || 1;
 
