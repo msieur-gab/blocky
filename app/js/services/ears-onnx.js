@@ -216,7 +216,17 @@ async function startActive() {
     console.log('[ears-onnx] AudioContext rate=', audioCtx.sampleRate, 'state=', audioCtx.state);
 
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+    try {
+      sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+    } catch (e) {
+      // Gecko (Firefox, GeckoView 128) will not connect a 48 kHz microphone to a 16 kHz
+      // context: "Connecting AudioNodes from AudioContexts with different sample-rate is
+      // currently not supported". Run the context at the device rate; the worklet resamples.
+      console.warn('[ears-onnx] mic does not fit a 16 kHz context, using the device rate:', e.message);
+      try { await audioCtx.close(); } catch (_) {}
+      audioCtx = new AudioContext();
+      sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+    }
 
     // AudioWorklet module load is idempotent — safe to call again on restart.
     await audioCtx.audioWorklet.addModule(
