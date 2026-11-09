@@ -12,6 +12,7 @@
 
 import { bus } from '../utils/events.js';
 import * as faceApi from '../face-api.js';
+import { getActiveSkill } from '../kernel.js';
 
 const ON_INTENTS = new Set(['light_on', 'dark', 'emotion_scared']);
 const AUTO_OFF_MS = 5 * 60 * 1000;
@@ -55,6 +56,11 @@ export function lightOff() {
   on = false;
   document.body.classList.remove('night-light');
   faceApi.setPalette(null);
+  // Back to blocky's normal face: "I'm scared" / "it's dark" left it in the scared ambient,
+  // and the dark is over (Gab, 2026-11-09). Inside a game, only the ambient is reset, so the
+  // game's own faces are not cut short; it shows once the game ends.
+  faceApi.setAmbient('calm');
+  if (getActiveSkill() === 'presence') faceApi.behavior('calm');
   shell('off');
   console.log('[light] off');
   bus.emit('light:off');
