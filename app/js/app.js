@@ -11,6 +11,7 @@ import * as camera from './services/camera.js';
 import * as faces from './services/faces.js';
 import * as intent from './services/intent.js';
 import * as display from './services/display.js';
+import * as light from './services/light.js';
 import * as nlu from './services/nlu.js';
 import * as memory from './services/memory.js';
 import * as voice from './services/voice.js';
@@ -352,6 +353,7 @@ async function startNormalMode() {
 initSheet();
 initReactionLog();
 kernel.init();
+light.init();
 
 dom.themeToggle.addEventListener('click', () => {
   darkTheme = !darkTheme;

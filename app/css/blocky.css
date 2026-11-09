@@ -84,6 +84,10 @@ html, body {
 .theme-light #screen-wrap { --screen-bg: #f0efe8; background: var(--screen-bg); }
 .theme-light #theme-toggle { color: rgba(0,0,0,0.5); }
 
+/* Night light (js/services/light.js): warm white, wins over both themes */
+body.night-light, body.night-light #screen-wrap { --screen-bg: #fff6e5; background: var(--screen-bg); }
+body.night-light #theme-toggle { color: rgba(0,0,0,0.5); }
+
 /* ═══════════════════════════════════════
    DEV FAB
    ═══════════════════════════════════════ */

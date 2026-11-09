@@ -16,6 +16,10 @@ const INTENT_MAP = {
   emotion_happy:  { chain: 'child_laughed',      ambient: 'happy' },
   emotion_sad:    { chain: 'child_sad',          ambient: 'sad' },
   emotion_scared: { chain: 'child_scared',       ambient: 'scared' },
+  // Night light (services/light.js): the dark is scary for blocky too (empathy, not comfort)
+  dark:           { chain: 'child_scared',       ambient: 'scared' },
+  light_on:       { gesture: 'nod',              ambient: 'calm' },
+  light_off:      { gesture: 'nod',              ambient: 'calm' },
   emotion_angry:  { chain: 'child_angry',        ambient: 'angry' },
   question:       { chain: 'attention',          ambient: 'curious' },
   love:           { chain: 'love_reaction',      ambient: 'happy' },

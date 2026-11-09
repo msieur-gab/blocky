@@ -18,6 +18,17 @@ import * as nlu from './nlu.js';
 const RULES = [
   // ── Specific multi-word phrases first ──
 
+  // Night light (services/light.js). "open the light" is how a French speaker says it.
+  // Off before on: both are about the light, only the small word differs.
+  { intent: 'light_off', words: ['turn off the light', 'turn the light off', 'switch off the light',
+    'switch the light off', 'close the light', 'lights off', 'light off',
+    'turn off the lights', 'turn the lights off', 'switch off the lights', 'close the lights'] },
+  { intent: 'light_on', words: ['turn on the light', 'turn the light on', 'switch on the light',
+    'switch the light on', 'open the light', 'put the light on', 'lights on', 'light on',
+    'turn on the lights', 'turn the lights on', 'switch on the lights', 'open the lights'] },
+  // The dark is a fear: blocky is scared with the child, and the light comes on
+  { intent: 'dark', words: ["it's dark", 'it is dark', 'too dark', 'so dark', 'dark in here', 'very dark'] },
+
   // Music (before play — "play music" is music, not play)
   { intent: 'music', words: ['play music', 'play some music', 'play a song', 'play me a song',
     'put on music', 'put on some music', 'sing something', 'sing me', 'some music',
@@ -173,6 +184,9 @@ export const INTENT_MAP = {
   disagree_strong: { reaction: 'disagree_strong', mood: 'angry' },
   negation:      { reaction: null,            mood: 'calm' },
   look:          { reaction: 'attention',     mood: 'curious' },
+  light_on:      { reaction: 'agree',         mood: 'calm' },
+  light_off:     { reaction: 'agree',         mood: 'calm' },
+  dark:          { reaction: 'child_scared',  mood: 'scared' },
   time:          { reaction: null,            mood: 'calm' },
   stop:          { reaction: null,            mood: 'calm' },
   // introduction has no fixed reaction — triggers camera via faces.js
