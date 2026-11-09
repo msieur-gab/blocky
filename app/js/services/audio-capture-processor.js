@@ -33,7 +33,9 @@ class CaptureProcessor extends AudioWorkletProcessor {
 
     // Compact the buffer if the new chunk wouldn't fit.
     if (this.bufLen + ch0.length > this.buf.length) {
-      const start = Math.floor(this.outIdx);
+      // The read pointer can step past the end (ratio 3 at 48 kHz): never drop more than is
+      // there, or bufLen goes negative and set() throws, which kills the worklet for good.
+      const start = Math.min(Math.floor(this.outIdx), this.bufLen);
       const remaining = this.bufLen - start;
       this.buf.copyWithin(0, start, this.bufLen);
       this.bufLen = remaining;
