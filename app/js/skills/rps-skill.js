@@ -201,6 +201,8 @@ function startDetection() {
 
 function onGesture({ gesture }) {
   if (state.phase !== 'detect' || !ctx) return;
+  // Only a move counts: a heart or a thumbs up is not a loss
+  if (!MOVES.includes(gesture)) return;
 
   state.playerMove = gesture;
   console.log(`[rps] Player: ${gesture}`);

@@ -15,6 +15,14 @@ let loopTimer = null;
 let lastGesture = null;
 let lastGestureTime = 0;
 
+// A heart counts once it has been seen in HEART_FRAMES frames in a row (~0.3 s at 10 fps):
+// drawn from landmarks by hand, it appeared from nowhere on one frame (2026-11-09).
+// MediaPipe's own gestures count on the first frame, as before: held to 3 frames, an open
+// palm (paper) flickered and was missed, and the game lost its fun.
+const HEART_FRAMES = 3;
+let candidate = null;
+let candidateFrames = 0;
+
 // MediaPipe built-in gesture → our gesture name
 const GESTURE_MAP = {
   'Closed_Fist':  'rock',
@@ -60,28 +68,9 @@ function detectLoop(video) {
     const now = performance.now();
     const results = gestureRecognizer.recognizeForVideo(video, now);
 
-    // Check for heart gesture
-    if (results.landmarks && results.landmarks.length > 0) {
-      // One-hand finger heart (thumb tip + index tip crossing)
-      const heart1 = detectFingerHeart(results.landmarks[0]);
-      if (heart1) {
-        lastGesture = 'heart';
-        lastGestureTime = Date.now();
-        bus.emit('gesture:detected', { gesture: 'heart', confidence: heart1.confidence, raw: 'finger_heart' });
-      }
-
-      // Two-hand heart (both hands' tips touching)
-      if (results.landmarks.length === 2) {
-        const heart2 = detectTwoHandHeart(results.landmarks[0], results.landmarks[1]);
-        if (heart2) {
-          lastGesture = 'heart';
-          lastGestureTime = Date.now();
-          bus.emit('gesture:detected', { gesture: 'heart', confidence: heart2.confidence, raw: 'two_hand_heart' });
-        }
-      }
-    }
-
-    // Built-in gesture recognition
+    // One reading per frame. MediaPipe's own gestures first: a fist is rock, not a heart
+    // (the finger-heart test alone took every fist for one).
+    let seen = null;
     if (results.gestures && results.gestures.length > 0) {
       const topGesture = results.gestures[0][0];
       const name = topGesture.categoryName;
@@ -93,11 +82,25 @@ function detectLoop(video) {
       }
 
       const mapped = GESTURE_MAP[name];
-      if (mapped && confidence > 0.4) {
-        lastGesture = mapped;
-        lastGestureTime = Date.now();
-        bus.emit('gesture:detected', { gesture: mapped, confidence, raw: name });
-      }
+      if (mapped && confidence > 0.4) seen = { gesture: mapped, confidence, raw: name };
+    }
+
+    // Hearts: drawn by hand, looked for only when MediaPipe is not sure of one of its own
+    if (!seen && results.landmarks && results.landmarks.length > 0) {
+      const heart2 = results.landmarks.length === 2 && detectTwoHandHeart(results.landmarks[0], results.landmarks[1]);
+      const heart1 = !heart2 && detectFingerHeart(results.landmarks[0]);
+      if (heart2) seen = { gesture: 'heart', confidence: heart2.confidence, raw: 'two_hand_heart' };
+      else if (heart1) seen = { gesture: 'heart', confidence: heart1.confidence, raw: 'finger_heart' };
+    }
+
+    // A heart must be held, not glimpsed
+    if (seen && candidate === seen.gesture) candidateFrames++;
+    else { candidate = seen?.gesture || null; candidateFrames = seen ? 1 : 0; }
+
+    if (seen && (seen.gesture !== 'heart' || candidateFrames >= HEART_FRAMES)) {
+      lastGesture = seen.gesture;
+      lastGestureTime = Date.now();
+      bus.emit('gesture:detected', seen);
     }
   } catch (e) {
     // Ignore transient detection errors
@@ -155,6 +158,11 @@ function detectFingerHeart(hand) {
 
   // Need at least 2 of 3 fingers curled, and thumb reaching across
   if (curledCount < 2) return null;
+
+  // The index reaches out (its tip further from the wrist than its middle joint). In a fist
+  // it folds back into the palm, with the thumb lying across it: that was read as a heart.
+  const wrist = hand[0];
+  if (dist(indexTip, wrist) < dist(indexPip, wrist)) return null;
 
   const distScore = 1 - closestDist / 0.09;
   const curlScore = curledCount / 3;
@@ -228,6 +236,7 @@ export async function start() {
 
   running = true;
   lastGesture = null;
+  candidate = null; candidateFrames = 0;
   console.log('[gestures] Detection started');
   bus.emit('gestures:started');
 
@@ -250,4 +259,4 @@ export function stop() {
 export function getGesture() { return lastGesture; }
 export function getGestureAge() { return Date.now() - lastGestureTime; }
 export function isRunning() { return running; }
-export function clearGesture() { lastGesture = null; }
+export function clearGesture() { lastGesture = null; candidate = null; candidateFrames = 0; }
